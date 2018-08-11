@@ -110,37 +110,12 @@ class PDFHandler:
             return pdfs
 
         def setDirectory(fileName):
-            path = '{}/{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol), fileName)
+            path = '{}/{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.symbol, self.companyName), fileName)
             directory = os.path.dirname(path)
             
             if not os.path.exists(directory):
                 os.makedirs(directory)
             return path
-
-        def download(source, localPath):
-            def requests_retry_session(
-                retries=3,
-                backoff_factor=0.3,
-                status_forcelist=(500, 502, 504),
-                session=None,
-            ):
-                waiting_at_least_seconds(14)
-                session = session or requests.Session()
-                retry = Retry(
-                    total=retries,
-                    read=retries,
-                    connect=retries,
-                    backoff_factor=backoff_factor,
-                    status_forcelist=status_forcelist,
-                )
-                adapter = HTTPAdapter(max_retries=retry)
-                session.mount('http://', adapter)
-                session.mount('https://', adapter)
-                return session
-
-            r = requests_retry_session().get(source)
-            with open(localPath, 'wb') as f:
-                copyfileobj(r.raw, f)
 
         def logDownloads(total, downloaded):
             if downloaded == total:
@@ -150,7 +125,7 @@ class PDFHandler:
 
         def merge_files(needCleanUp=cleanUp):
             print('Start gathering files...')
-            pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
+            pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.symbol, self.companyName)))
             pdfs.sort(key=lambda x: x[-12:])
             
             for pdf in pdfs:
@@ -158,7 +133,6 @@ class PDFHandler:
 
             merger = PdfFileMerger()
             for pdf in pdfs:
-                print('I am in!')
                 merger.append(pdf)
             
             print('Starting merging...')
@@ -167,21 +141,21 @@ class PDFHandler:
                 print('Merged successfully.')
 
             if needCleanUp:
-                rmtree('{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
+                rmtree('{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.symbol, self.companyName)))
                 print('Clean up.')
 
         if len(symbol) <= 5:
             symbol = stock_code(symbol)
             self.pdfs = retrieve_urls(symbol)
 
-            # for i, pdf in enumerate(self.pdfs):
-            #     fileName = pdf[0]
-            #     source = pdf[1]
-            #     localPath = setDirectory(fileName)
+            for i, pdf in enumerate(self.pdfs):
+                fileName = pdf[0]
+                source = pdf[1]
+                localPath = setDirectory(fileName)
                 
-            #     print('Start downloading {} from {}'.format(fileName, source))
-            #     download(source, localPath)
-            #     logDownloads(len(self.pdfs), i+1)
+                print('Start downloading {} from {}'.format(fileName, source))
+                urlretrieve(source, localPath)
+                logDownloads(len(self.pdfs), i+1)
             
             if mergeFiles:
                 merge_files()
