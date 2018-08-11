@@ -2,12 +2,9 @@ import os
 import time
 from random import randint
 from urllib.request import urlretrieve
-from urllib.error import URLError
 from glob import glob
-from shutil import rmtree, copyfileobj
+from shutil import rmtree
 import requests
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfFileMerger
 
@@ -110,7 +107,7 @@ class PDFHandler:
             return pdfs
 
         def setDirectory(fileName):
-            path = '{}/{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.symbol, self.companyName), fileName)
+            path = '{}/{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol), fileName)
             directory = os.path.dirname(path)
             
             if not os.path.exists(directory):
@@ -125,11 +122,8 @@ class PDFHandler:
 
         def merge_files(needCleanUp=cleanUp):
             print('Start gathering files...')
-            pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.symbol, self.companyName)))
+            pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
             pdfs.sort(key=lambda x: x[-12:])
-            
-            for pdf in pdfs:
-                print(pdf)
 
             merger = PdfFileMerger()
             for pdf in pdfs:
@@ -141,7 +135,7 @@ class PDFHandler:
                 print('Merged successfully.')
 
             if needCleanUp:
-                rmtree('{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.symbol, self.companyName)))
+                rmtree('{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
                 print('Clean up.')
 
         if len(symbol) <= 5:
@@ -165,4 +159,4 @@ class PDFHandler:
         print('Exit')
 
 handler = PDFHandler('downloaded')
-handler.get('813')
+handler.get('1')
