@@ -6,7 +6,7 @@ from glob import glob
 from shutil import rmtree
 import requests
 from bs4 import BeautifulSoup
-from PyPDF2 import PdfFileMerger
+from PyPDF2 import PdfFileMerger, PdfFileReader
 
 class PDFHandler:
     downloadDirectory = ''      # The place pdf got saved
@@ -126,8 +126,13 @@ class PDFHandler:
             pdfs.sort(key=lambda x: x[-12:])
 
             merger = PdfFileMerger()
+            cursor = 0
             for pdf in pdfs:
+                reader = PdfFileReader(pdf)
+                merger.addBookmark(pdf.split('/')[-1][:-13], cursor)
                 merger.append(pdf)
+                print('{} merged.'.format(pdf.split('/')[-1][:-13]))
+                cursor = cursor + reader.getNumPages()
             
             print('Starting merging...')
             with open('{}/{}.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
