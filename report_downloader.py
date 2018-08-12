@@ -153,7 +153,14 @@ class PDFHandler:
                 localPath = setDirectory(fileName)
                 
                 print('Start downloading {} from {}'.format(fileName, source))
-                urlretrieve(source, localPath)
+                for j in range(3):
+                    try:
+                        urlretrieve(source, localPath)
+                        break
+                    except:
+                        print('Retrying again... {} time{}'.format(j+1, '' if j == 0 else 's'))
+                        waiting_at_least_seconds(4)
+                        pass
                 logDownloads(len(self.pdfs), i+1)
             
             if mergeFiles:
