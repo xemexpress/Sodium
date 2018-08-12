@@ -5,19 +5,26 @@ To automate the visualisation of financial data of listed companies.
 - Visualisation 
   - [ ] Line chart [P]
   - [ ] Value [V]
-- Financial data
+- Financial data (fundamental)
   - [ ] year
+  - [ ] currencyUnit
   - [ ] turnover
   - [ ] grossProfit
-  - [ ] incomeAttrToOwners
-  - [ ] cash
-  - [ ] netCurrentAssets
-  - [ ] netAssets
-  - [ ] totalLiabilities
+  - [ ] incomeToOwners
+  - [ ] cashAndEquivalents
+  - [ ] currentAssets
+  - [ ] nonCurrentAssets
+  - [ ] currentLiabilities
+  - [ ] nonCurrentLiabilities
+  - [ ] numShares
+- Financial data (abstract)
   - [ ] grossProfitMargin
-  - [ ] debtToAssetRatio
+  - [ ] R
+  - [ ] netCurrentAssets
+  - [ ] currentRatio
+  - [ ] netAssets
+  - [ ] debtAssetRatio
   - [ ] bookValuePerShare
+- Daily basis
   - [ ] P7E
   - [ ] PB
-  - [ ] R
-
