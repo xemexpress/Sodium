@@ -25,6 +25,6 @@ To automate the visualisation of financial data of listed companies.
   - [ ] netAssets
   - [ ] debtAssetRatio
   - [ ] bookValuePerShare
-- Daily basis
+- More
   - [ ] P7E
   - [ ] PB
