@@ -134,7 +134,7 @@ class PDFHandler:
                 print('{} merged.'.format(pdf.split('/')[-1][:-13]))
                 cursor = cursor + reader.getNumPages()
             
-            print('Starting merging...')
+            print('Start writing...')
             with open('{}/{}.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
                 merger.write(tar)
                 print('Merged successfully.')
