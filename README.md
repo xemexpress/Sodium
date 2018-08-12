@@ -1,6 +1,6 @@
 # Sodium
 
-To automate the visualisation of financial data of listed companies.
+To automate the **visualisation** of financial **data** of listed companies.
 
 - Visualisation 
   - [ ] Line chart [P]
