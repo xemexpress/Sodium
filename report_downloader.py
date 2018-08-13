@@ -14,11 +14,11 @@ class PDFHandler:
     symbol = ''                 # Symbol of listed company
     pdfs = []                   # [(fileName, source)]
 
-    def __init__(self, downloadDirectory='downloaded'):
-        self.downloadDirectory = downloadDirectory
+    def __init__(self, downloadDirectory):
+        self.downloadDirectory = 'downloaded' if downloadDirectory in [None, ''] else downloadDirectory
 
     # pdfs is set.
-    def get(self, symbol, mergeFiles=True, cleanUp=True):
+    def get(self, symbol, mergeFiles=False, cleanUp=False):
         def stock_code(symbol):         # return a 5-letter-long symbol
             while len(symbol) < 5:
                 symbol = '0' + symbol
@@ -169,6 +169,3 @@ class PDFHandler:
             print('The symbol provided is invalid.')
 
         print('Exit')
-
-handler = PDFHandler('downloaded')
-handler.get('1')
