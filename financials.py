@@ -8,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfFileMerger, PdfFileReader
 
-class PDFHandler:
+class FinReportHandler:
     downloadDirectory = ''      # The place pdf got saved
     companyName = ''            # Name of listed company
     symbol = ''                 # Symbol of listed company
@@ -133,7 +133,7 @@ class PDFHandler:
                 merger.append(pdf)
                 print('{} merged.'.format(pdf.split('/')[-1][:-13]))
                 cursor = cursor + reader.getNumPages()
-            
+
             print('Start writing...')
             with open('{}/{}.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
                 merger.write(tar)
@@ -169,3 +169,7 @@ class PDFHandler:
             print('The symbol provided is invalid.')
 
         print('Exit')
+
+    def filterByBookmark(self, words):
+        print()
+        

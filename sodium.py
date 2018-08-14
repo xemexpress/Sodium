@@ -1,5 +1,5 @@
 from sys import argv
-from report_downloader import PDFHandler
+from financials import FinReportHandler
 
 # Format: python test.py [-m] [-c] [--directory=DIRECTORY] SYMBOL
 #   -m    Merge downloaded files
@@ -15,9 +15,9 @@ if __name__ == '__main__':
   argv = [arg for arg in argv if arg not in options]
 
   symbol = argv[1]
-  mergeFiles = True if '-m' in options else False
-  cleanUp = True if '-c' in options else False
+  mergeFiles = '-m' in options
+  cleanUp = '-c' in options
   downloadDirectory = getOption('directory', options)
 
-  handler = PDFHandler(downloadDirectory)
+  handler = FinReportHandler(downloadDirectory)
   handler.get(symbol, mergeFiles=mergeFiles, cleanUp=cleanUp)
