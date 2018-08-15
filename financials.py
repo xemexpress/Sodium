@@ -6,34 +6,45 @@ from glob import glob
 from shutil import rmtree
 import requests
 from bs4 import BeautifulSoup
-from PyPDF2 import PdfFileMerger, PdfFileReader
+from PyPDF2 import PdfFileReader, PdfFileMerger, PdfFileWriter
 
 class FinReportHandler:
     downloadDirectory = ''      # The place pdf got saved
     companyName = ''            # Name of listed company
     symbol = ''                 # Symbol of listed company
-    pdfs = []                   # [(fileName, source)]
+    pdfs = []                   # [pathName] if downloaded else [(fileName, source)]
 
     def __init__(self, downloadDirectory):
         self.downloadDirectory = 'downloaded' if downloadDirectory in [None, ''] else downloadDirectory
+    
+    def announce(self, message, wait=0, skip=0):
+        print(message, end=' (waiting for {} seconds)'.format(wait) if wait is not 0 else '')
+        while wait > 0:
+            print('.', end='', flush=True)
+            time.sleep(1)
+            wait -= 1
+        print('\n' * skip if skip is not 0 else '')
 
     # pdfs is set.
-    def get(self, symbol, mergeFiles=False, cleanUp=False):
-        def stock_code(symbol):         # return a 5-letter-long symbol
-            while len(symbol) < 5:
-                symbol = '0' + symbol
-            print('Handling the company({})...'.format(symbol))
-            return symbol
+    def get(self, symbol, skipDownload, retryMax):
+        # This would set companyName, symbol and pdfs.
+        def set_class_properties(symbol=symbol, skipPdfs=skipDownload):
+            def stock_code(symbol):         # return a 5-letter-long symbol
+                while len(symbol) < 5:
+                    symbol = '0' + symbol
+                print('Handling the company({})...'.format(symbol))
+                return symbol
 
-        def waiting_at_least_seconds(seconds):
-            seconds = seconds + randint(0,4)
-            print('Waiting for {} seconds...'.format(seconds))
-            time.sleep(seconds)
+            def append_urls(bs, pdfs):
+                for pdf in bs.find_all('a', { 'class': 'news' }):
+                    # Format: name + publicationDate(for sake of sorting)
+                    fileName = '{} {}.pdf'.format(pdf.get_text(), ''.join(pdf.get('href').split('/')[4:6]))
+                    source = 'http://www.hkexnews.hk' + pdf.get('href')
+                    pdfs.append([fileName, source])
+                    print('PDF {} retrieved.'.format(pdf.get_text()))
 
-        def retrieve_urls(symbol):          # companyName and symbol are set.
-            print('Start crawling...')
-            pdfs = []
-            
+            self.symbol = stock_code(symbol)
+            self.announce('Start crawling', wait=(4+randint(0,4)))
             headers = {
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
@@ -52,7 +63,7 @@ class FinReportHandler:
                 '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
                 'ctl00$txt_today': bs.find('input', { 'name': 'ctl00$txt_today' }).get('value'),
                 'ctl00$hfStatus': bs.find('input', { 'name': 'ctl00$hfStatus' }).get('value'),
-                'ctl00$txt_stock_code': symbol,
+                'ctl00$txt_stock_code': self.symbol,
                 'ctl00$rdo_SelectDocType': 'rbAfter2006',
                 'ctl00$sel_tier_1': 4,
                 'ctl00$sel_DocTypePrior2006': -1,
@@ -74,39 +85,27 @@ class FinReportHandler:
             response = session.post('http://www.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', data=form_data, headers=headers)
             bs = BeautifulSoup(response.content, 'lxml')
 
-            self.symbol = symbol
             self.companyName = bs.find('span', { 'id': 'ctl00_lblStockName' }).get_text()
+            
+            if not skipPdfs:
+                append_urls(bs, self.pdfs)
 
-            for pdf in bs.find_all('a', { 'class': 'news' }):
-                # Format: name + publicationDate(for sake of sorting)
-                fileName = '{} {}.pdf'.format(pdf.get_text(), ''.join(pdf.get('href').split('/')[4:6]))
-                source = 'http://www.hkexnews.hk' + pdf.get('href')
-                pdfs.append([fileName, source])
-                print('PDF {} retrieved.'.format(pdf.get_text()))
-
-            nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
-            while nextBtn is not None:
-                waiting_at_least_seconds(4)
-                form_data = {
-                    '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
-                    '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
-                    '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
-                    'ctl00$btnNext.x': 1,
-                    'ctl00$btnNext.y': 1
-                }
-                response = session.post('http://www.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', data=form_data, headers=headers)
-                bs = BeautifulSoup(response.content, 'lxml')
-                for pdf in bs.find_all('a', { 'class': 'news' }):
-                    # Format: name + publicationDate(for sake of sorting)
-                    fileName = '{} {}.pdf'.format(pdf.get_text(), ''.join(pdf.get('href').split('/')[4:6]))
-                    source = 'http://www.hkexnews.hk' + pdf.get('href')
-                    pdfs.append([fileName, source])
-                    print('PDF {} retrieved.'.format(pdf.get_text()))
                 nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
-                
-            return pdfs
+                while nextBtn is not None:
+                    self.announce('Heading to next button', wait=(4+randint(0,4)))
+                    form_data = {
+                        '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
+                        '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
+                        '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
+                        'ctl00$btnNext.x': 1,
+                        'ctl00$btnNext.y': 1
+                    }
+                    response = session.post('http://www.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', data=form_data, headers=headers)
+                    bs = BeautifulSoup(response.content, 'lxml')
+                    append_urls(bs, self.pdfs)
+                    nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
 
-        def setDirectory(fileName):
+        def set_directory(fileName):
             path = '{}/{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol), fileName)
             directory = os.path.dirname(path)
             
@@ -114,62 +113,90 @@ class FinReportHandler:
                 os.makedirs(directory)
             return path
 
-        def logDownloads(total, downloaded):
+        def log_downloads(total, downloaded):
             if downloaded == total:
-                print('All files downloaded successfully.')
+                self.announce('All files downloaded successfully.', skip=7)
             else:
-                print('{} files downloaded. Got {} left...'.format(downloaded, total - downloaded))
+                print('{} files downloaded. Got {} left.'.format(downloaded, total - downloaded))
 
-        def merge_files(needCleanUp=cleanUp):
-            print('Start gathering files...')
-            pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
-            pdfs.sort(key=lambda x: x[-12:])
+        if len(symbol) <= 5:
+            set_class_properties()
 
+            if not skipDownload:
+                for i, pdf in enumerate(self.pdfs):
+                    fileName = pdf[0]
+                    source = pdf[1]
+                    localPath = set_directory(fileName)
+                    
+                    print('Start downloading {} from {}'.format(fileName, source))
+                    for j in range(retryMax):
+                        try:
+                            urlretrieve(source, localPath)
+                            break
+                        except:
+                            self.announce('Retrying again', wait=(4+randint(0,4)))
+                            pass
+                    log_downloads(len(self.pdfs), i+1)
+
+            self.pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
+            self.pdfs.sort(key=lambda x: x[-12:])
+        else:
+            print('The symbol provided is invalid.')
+
+    def extract_tables(self, word):
+        def head_and_tail(reader, destinations, word=word):
+            # Destination's format: [(title, pageNum)]
+            lastMark = None
+            markNext = False
+            for des in reader.getOutlines():
+                lastMark = des if markNext else lastMark
+
+                markNext = word in des.title
+                if markNext:
+                    destinations.append((des.title, reader.getDestinationPageNumber(des)))
+                    print('{} extracted'.format(des.title))
+            destinations.append((lastMark.title, reader.getDestinationPageNumber(lastMark)) if lastMark is not None else lastMark)
+
+            return range(destinations[0][1], destinations[-1][1]) if destinations[0] is not None else []
+
+        print('Start extracting tables...')
+        writer = PdfFileWriter()
+        printingPage = 0
+        for pdf in self.pdfs:
+            fileName = pdf.split('/')[-1][:-13]
+            print('Searching in {}'.format(fileName))
+            reader = PdfFileReader(pdf)
+            isFirstPage = True
+            parent = None
+            bookmarks = []
+            for i in head_and_tail(reader, bookmarks):
+                page = reader.getPage(i)
+                writer.addPage(page)
+                title = [title for title, pageNum in bookmarks if i == pageNum]
+                if isFirstPage:
+                    parent = writer.addBookmark(fileName, printingPage)
+                    isFirstPage = False
+                if title:
+                    writer.addBookmark(title[0], printingPage, parent)
+                printingPage += 1
+        
+        with open('{}/{} Tables.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
+            writer.write(tar)
+            self.announce('Tables merged successfully.', skip=7)
+
+    def merge_files(self):
+            print('Start merging files...')
             merger = PdfFileMerger()
-            cursor = 0
-            for pdf in pdfs:
-                reader = PdfFileReader(pdf)
-                merger.addBookmark(pdf.split('/')[-1][:-13], cursor)
-                merger.append(pdf)
-                print('{} merged.'.format(pdf.split('/')[-1][:-13]))
-                cursor = cursor + reader.getNumPages()
+            for pdf in self.pdfs:
+                fileName = pdf.split('/')[-1][:-13]
+                merger.append(pdf, bookmark=fileName)
+                print('{} merged.'.format(fileName))
 
             print('Start writing...')
             with open('{}/{}.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
                 merger.write(tar)
-                print('Merged successfully.')
+                self.announce('Merged successfully.', skip=7)
 
-            if needCleanUp:
-                rmtree('{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
-                print('Clean up.')
-
-        if len(symbol) <= 5:
-            symbol = stock_code(symbol)
-            self.pdfs = retrieve_urls(symbol)
-
-            for i, pdf in enumerate(self.pdfs):
-                fileName = pdf[0]
-                source = pdf[1]
-                localPath = setDirectory(fileName)
-                
-                print('Start downloading {} from {}'.format(fileName, source))
-                for j in range(3):
-                    try:
-                        urlretrieve(source, localPath)
-                        break
-                    except:
-                        print('Retrying again... {} time{}'.format(j+1, '' if j == 0 else 's'))
-                        waiting_at_least_seconds(4)
-                        pass
-                logDownloads(len(self.pdfs), i+1)
-            
-            if mergeFiles:
-                merge_files()
-        else:
-            print('The symbol provided is invalid.')
-
-        print('Exit')
-
-    def filterByBookmark(self, words):
-        print()
-        
+    def clean_up(self):
+        rmtree('{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
+        print('Cleaned up.')
