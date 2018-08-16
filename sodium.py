@@ -1,22 +1,6 @@
 from sys import argv
 from financials import FinReportHandler
 
-# NAME
-#       sodium
-#
-# SYNOPSIS:
-#       python sodium.py [ help | [ -S ] [ -t ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry=MAX ] SYMBOL ]
-#
-# OPTIONS:
-#       -S            Skip download process, usually because files have been downloaded.
-#       -t            Extract pages containing table(s) and merge for data analysis.
-#       -m            Merge downloaded financial reports for further studies.
-#       -C            Clean up downloaded financial reports.
-#
-# PARAMS:
-#       --directory   The download directory.
-#       --retry       Number of retries made when failed to download the pdf from HKEX
-
 if __name__ == '__main__':
   def get_param(name, options):
     prefix = 3 + len(name)
@@ -26,7 +10,7 @@ if __name__ == '__main__':
   options = [arg for arg in argv if arg.startswith('-')]
   argv = [arg for arg in argv if arg not in options]
 
-  if 'help' in argv:
+  if 'help' in argv or len(argv) is 1:
     description = """
 NAME
       sodium - a helper to automate the visualisation of financial data of listed companies.
