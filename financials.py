@@ -143,15 +143,18 @@ class FinReportHandler:
         else:
             print('The symbol provided is invalid.')
 
-    def extract_tables(self, word):
-        def head_and_tail(reader, destinations, word=word):
+    def extract_tables(self, wanted, unwanted, onlyFirstThree):
+        def head_and_tail(reader, destinations, wantedWord=wanted, unwantedWord=unwanted, requireConsolidated=onlyFirstThree):
             # Destination's format: [(title, pageNum)]
             lastMark = None
             markNext = False
             for des in reader.getOutlines():
                 lastMark = des if markNext else lastMark
 
-                markNext = word in des.title
+                if requireConsolidated and len(destinations) == 3:
+                    break
+
+                markNext = wantedWord in des.title and unwantedWord not in des.title
                 if markNext:
                     destinations.append((des.title, reader.getDestinationPageNumber(des)))
                     print('{} extracted'.format(des.title))
