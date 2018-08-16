@@ -21,6 +21,7 @@ SYNOPSIS:
 OPTIONS:
       -S            Skip download process, usually because files have been downloaded.
       -t            Extract pages containing table(s) and merge for data analysis.
+      -T            Provide a consolidated version of -t
       -m            Merge downloaded financial reports for further studies.
       -C            Clean up downloaded financial reports.
 
@@ -32,7 +33,7 @@ PARAMS:
   else:
     symbol = argv[1]
     skipDownload = '-S' in options
-    needTables = '-t' in options
+    needTables = '-t' in options or '-T' in options
     needMergeFiles = '-m' in options
     needCleanUp = '-C' in options
     downloadDirectory = get_param('directory', options)
@@ -44,7 +45,8 @@ PARAMS:
     handler.get(symbol, skipDownload, retryMax)
 
     if needTables:
-      handler.extract_tables('表')
+      consolidated = '-T' in options
+      handler.extract_tables(wanted='表', unwanted='附註', onlyFirstThree=consolidated)
 
     if needMergeFiles:
       handler.merge_files()
