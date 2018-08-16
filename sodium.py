@@ -1,14 +1,21 @@
 from sys import argv
 from financials import FinReportHandler
 
-# Format: python test.py [-S] [-t] [-m] [-c] [--directory=DIRECTORY] [--retry=MAX] SYMBOL
-#   -S    Skip download process, usually because files have been downloaded.
-#   -t    Extract pages containing table(s) and merge for data analysis.
-#   -m    Merge downloaded financial reports for further studies.
-#   -c    Clean up downloaded financial reports.
+# Format:
+#   python sodium.py [-S] [-t] [-m] [-C] [--directory=DIRECTORY] [--retry=MAX] SYMBOL
+#
+# Options:
+#   -S              Skip download process, usually because files have been downloaded.
+#   -t              Extract pages containing table(s) and merge for data analysis.
+#   -m              Merge downloaded financial reports for further studies.
+#   -C              Clean up downloaded financial reports.
+#
+# Params:
+#   --directory     The download directory.
+#   --retry         Number of retries made when failed to download the pdf from HKEX
 
 if __name__ == '__main__':
-  def get_option(name, options):
+  def get_param(name, options):
     prefix = 3 + len(name)
     provided = [opt[prefix:] for opt in options if '--{}'.format(name) in opt]
     return provided[0] if provided else None
@@ -20,9 +27,9 @@ if __name__ == '__main__':
   skipDownload = '-S' in options
   needTables = '-t' in options
   needMergeFiles = '-m' in options
-  needCleanUp = '-c' in options
-  downloadDirectory = get_option('directory', options)
-  retryMax = get_option('retry', options)
+  needCleanUp = '-C' in options
+  downloadDirectory = get_param('directory', options)
+  retryMax = get_param('retry', options)
 
   retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else 3)
 
