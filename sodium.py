@@ -16,11 +16,12 @@ NAME
       sodium - a helper to automate the visualisation of financial data of listed companies.
 
 SYNOPSIS:
-      python sodium.py [ help | [ -S ] [ -t ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry=MAX ] SYMBOL ]
+      python sodium.py [ help | [ -S ] [ -t ] [-n] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry=MAX ] SYMBOL ]
 
 OPTIONS:
       -S            Skip download process, usually because files have been downloaded.
       -t            Extract pages containing table(s) and merge for data analysis.
+      -n            Extract notes.
       -T            Provide a consolidated version of -t
       -m            Merge downloaded financial reports for further studies.
       -C            Clean up downloaded financial reports.
@@ -34,6 +35,7 @@ PARAMS:
     symbol = argv[1]
     skipDownload = '-S' in options
     needTables = '-t' in options or '-T' in options
+    needNotes = '-n' in options
     needMergeFiles = '-m' in options
     needCleanUp = '-C' in options
     downloadDirectory = get_param('directory', options)
@@ -47,6 +49,9 @@ PARAMS:
     if needTables:
       consolidated = '-T' in options
       handler.extract_tables(wanted='表', unwanted='附註', onlyFirstThree=consolidated)
+
+    if needNotes:
+      handler.extract_notes(wanted='附註')
 
     if needMergeFiles:
       handler.merge_files()

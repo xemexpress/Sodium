@@ -104,6 +104,8 @@ class FinReportHandler:
                     bs = BeautifulSoup(response.content, 'lxml')
                     append_urls(bs, self.pdfs)
                     nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
+            else:
+                print('Skip download process.\n\n\n\n')
 
         def set_directory(fileName):
             path = '{}/{}/{}'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol), fileName)
@@ -167,7 +169,7 @@ class FinReportHandler:
         printingPage = 0
         for pdf in self.pdfs:
             fileName = pdf.split('/')[-1][:-13]
-            print('Searching in {}'.format(fileName))
+            print('Searching in {}...'.format(fileName))
             reader = PdfFileReader(pdf)
             isFirstPage = True
             parent = None
@@ -186,6 +188,43 @@ class FinReportHandler:
         with open('{}/{} Tables.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
             writer.write(tar)
             self.announce('Tables merged successfully.', skip=7)
+
+    def extract_notes(self, wanted):
+        def head_and_tail(reader, wanted=wanted):
+            first = None
+            end = None
+
+            markNext = False
+            for des in reader.getOutlines():
+                end = des if markNext else end
+
+                markNext = '附註' in des.title
+                if markNext:
+                    print('Notes extracted.')
+                    first = reader.getDestinationPageNumber(des)
+            end = reader.getDestinationPageNumber(end) if end else (reader.getNumPages()+1)
+            return range(first, end)
+
+        print('Start extracting notes...')
+        writer = PdfFileWriter()
+        printingPage = 0
+        for pdf in self.pdfs:
+            # Extract notes
+            title = pdf.split('/')[-1][:-13] + ' 附註'
+            print('Searching in {}...'.format(title[:-3]))
+            reader = PdfFileReader(pdf)
+            isFirstPage = True
+            for i in head_and_tail(reader):
+                page = reader.getPage(i)
+                writer.addPage(page)
+                if isFirstPage:
+                    writer.addBookmark(title, printingPage)
+                    isFirstPage = False
+                printingPage += 1
+
+        with open('{}/{} Notes.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
+            writer.write(tar)
+            self.announce('Notes merged successfully.', skip=7)
 
     def merge_files(self):
             print('Start merging files...')
