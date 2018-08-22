@@ -15,7 +15,7 @@ class FinReportHandler:
     pdfs = []                   # [pathName] if downloaded else [(fileName, source)]
 
     def __init__(self, downloadDirectory):
-        self.downloadDirectory = 'downloaded' if downloadDirectory in [None, ''] else downloadDirectory
+        self.downloadDirectory = downloadDirectory
     
     def announce(self, message, wait=0, skip=0):
         print(message, end=' (waiting for {} seconds)'.format(wait) if wait is not 0 else '')

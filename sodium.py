@@ -10,6 +10,11 @@ if __name__ == '__main__':
   options = [arg for arg in argv if arg.startswith('-')]
   argv = [arg for arg in argv if arg not in options]
 
+  default = {
+    'retryMax': 3,
+    'downloadDirectory': 'downloaded'
+  }
+
   if 'help' in argv or len(argv) is 1:
     description = """
 NAME
@@ -27,8 +32,8 @@ OPTIONS:
       -C            Clean up downloaded financial reports.
 
 PARAMS:
-      --directory   The download directory.
-      --retry       Number of retries made when failed to download the pdf from HKEX
+      --directory   The download directory. Default: downloaded
+      --retry       Number of retries made when failed to download the pdf from HKEX. Default: 3
 """
     print(description)
   else:
@@ -41,7 +46,8 @@ PARAMS:
     downloadDirectory = get_param('directory', options)
     retryMax = get_param('retry', options)
 
-    retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else 3)
+    downloadDirectory = downloadDirectory if downloadDirectory not in [None, ''] else default['downloadDirectory']
+    retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
     handler = FinReportHandler(downloadDirectory)
     handler.get(symbol, skipDownload, retryMax)
