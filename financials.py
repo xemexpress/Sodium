@@ -104,6 +104,7 @@ class FinReportHandler:
                     bs = BeautifulSoup(response.content, 'lxml')
                     append_urls(bs, self.pdfs)
                     nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
+                print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), self.companyName, self.symbol))
             else:
                 print('Skip download process.\n\n\n\n')
 
@@ -115,30 +116,33 @@ class FinReportHandler:
                 os.makedirs(directory)
             return path
 
-        def log_downloads(total, downloaded):
-            if downloaded == total:
-                self.announce('All files downloaded successfully.', skip=7)
+        def log_downloads(total, acquired, existed):
+            if acquired == total:
+                self.announce('All files acquired successfully.', skip=7)
             else:
-                print('{} files downloaded. Got {} left.'.format(downloaded, total - downloaded))
+                print('{}. Got {} left.'.format('Downloaded' if not existed else 'Detected', total - acquired))
 
         if len(symbol) <= 5:
             set_class_properties()
 
             if not skipDownload:
+                prev = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
                 for i, pdf in enumerate(self.pdfs):
                     fileName = pdf[0]
                     source = pdf[1]
                     localPath = set_directory(fileName)
-                    
-                    print('Start downloading {} from {}'.format(fileName, source))
-                    for j in range(retryMax):
-                        try:
-                            urlretrieve(source, localPath)
-                            break
-                        except:
-                            self.announce('Retrying again', wait=(4+randint(0,4)))
-                            pass
-                    log_downloads(len(self.pdfs), i+1)
+                    existed = localPath in prev
+                    print('Start working on {}...'.format(fileName))
+                    if not existed:
+                        print('Downloading from {}'.format(source))
+                        for j in range(retryMax):
+                            try:
+                                urlretrieve(source, localPath)
+                                break
+                            except:
+                                self.announce('Retrying again', wait=(4+randint(0,4)))
+                                pass
+                    log_downloads(len(self.pdfs), i+1, existed)
 
             self.pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(self.companyName, self.symbol)))
             self.pdfs.sort(key=lambda x: x[-12:])
