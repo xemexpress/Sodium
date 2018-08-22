@@ -16,13 +16,13 @@ NAME
       sodium - a helper to automate the visualisation of financial data of listed companies.
 
 SYNOPSIS:
-      python sodium.py [ help | [ -S ] [ -t ] [-n] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry=MAX ] SYMBOL ]
+      python sodium.py [ help | [ -S ] [ -t | -T ] [-n] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry=MAX ] SYMBOL ]
 
 OPTIONS:
       -S            Skip download process, usually because files have been downloaded.
       -t            Extract pages containing table(s) and merge for data analysis.
-      -n            Extract notes.
       -T            Provide a consolidated version of -t
+      -n            Extract notes.
       -m            Merge downloaded financial reports for further studies.
       -C            Clean up downloaded financial reports.
 
