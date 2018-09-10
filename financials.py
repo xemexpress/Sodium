@@ -189,7 +189,7 @@ class FinReportHandler:
                     writer.addBookmark(title[0], printingPage, parent)
                 printingPage += 1
         
-        with open('{}/{} Tables.pdf'.format(self.downloadDirectory, self.companyName), 'wb') as tar:
+        with open('{}/{} {} Tables.pdf'.format(self.downloadDirectory, self.companyName, 'Consolidated' if onlyFirstThree else ''), 'wb') as tar:
             writer.write(tar)
             self.announce('Tables merged successfully.', skip=7)
 
