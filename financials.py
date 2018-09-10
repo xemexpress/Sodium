@@ -38,7 +38,7 @@ class FinReportHandler:
             def append_urls(bs, pdfs):
                 for pdf in bs.find_all('a', { 'class': 'news' }):
                     # Format: name + publicationDate(for sake of sorting)
-                    fileName = '{} {}.pdf'.format(pdf.get_text(), ''.join(pdf.get('href').split('/')[4:6]))
+                    fileName = '{} {}.pdf'.format(pdf.get_text().replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
                     source = 'http://www.hkexnews.hk' + pdf.get('href')
                     pdfs.append([fileName, source])
                     print('PDF {} retrieved.'.format(pdf.get_text()))
@@ -160,7 +160,7 @@ class FinReportHandler:
                 if requireConsolidated and len(destinations) == 3:
                     break
 
-                markNext = wantedWord in des.title and unwantedWord not in des.title
+                markNext = type(des) is not list and wantedWord in des.title and unwantedWord not in des.title
                 if markNext:
                     destinations.append((des.title, reader.getDestinationPageNumber(des)))
                     print('{} extracted'.format(des.title))
