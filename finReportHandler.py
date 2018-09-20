@@ -30,8 +30,7 @@ class FinReportHandler:
         # This would set companyName, symbol and pdfs.
         def set_class_properties(symbol=symbol, skipPdfs=skipDownload):
             def stock_code(symbol):         # return a 5-letter-long symbol
-                while len(symbol) < 5:
-                    symbol = '0' + symbol
+                symbol = symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
                 print('Handling the company({})...'.format(symbol))
                 return symbol
 
