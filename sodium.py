@@ -1,5 +1,5 @@
 from sys import argv
-from financials import FinReportHandler
+from finReportHandler import FinReportHandler
 
 if __name__ == '__main__':
   def get_param(name, options):
