@@ -56,11 +56,18 @@ class FinReportHandler:
             response = session.get('http://www.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', headers=headers)
             bs = BeautifulSoup(response.content, 'lxml')
 
+            date = bs.find('input', { 'name': 'ctl00$txt_today' }).get('value')
+            date = {
+                'year': date[:4],
+                'month': date[4:6],
+                'day': date[-2:]
+            }
+
             form_data = {
                 '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
                 '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
                 '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
-                'ctl00$txt_today': bs.find('input', { 'name': 'ctl00$txt_today' }).get('value'),
+                'ctl00$txt_today': date['year']+date['month']+date['day'],
                 'ctl00$hfStatus': bs.find('input', { 'name': 'ctl00$hfStatus' }).get('value'),
                 'ctl00$txt_stock_code': self.symbol,
                 'ctl00$rdo_SelectDocType': 'rbAfter2006',
@@ -74,9 +81,9 @@ class FinReportHandler:
                 'ctl00$sel_DateOfReleaseFrom_d': '01',
                 'ctl00$sel_DateOfReleaseFrom_m': '04',
                 'ctl00$sel_DateOfReleaseFrom_y': '1999',
-                'ctl00$sel_DateOfReleaseTo_d': '09',
-                'ctl00$sel_DateOfReleaseTo_m': '08',
-                'ctl00$sel_DateOfReleaseTo_y': '2018',
+                'ctl00$sel_DateOfReleaseTo_d': date['day'],
+                'ctl00$sel_DateOfReleaseTo_m': date['month'],
+                'ctl00$sel_DateOfReleaseTo_y': date['year'],
                 'ctl00$sel_defaultDateRange': 'SevenDays',
                 'ctl00$rdo_SelectSortBy': 'rbDateTime'
             }

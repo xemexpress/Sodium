@@ -1,5 +1,5 @@
 from sys import argv
-from finDataScraper import FinDataScraper
+from finDataScraper import Fin10JQKA, FinHKEX
 from finReportHandler import FinReportHandler
 
 description = """
@@ -8,8 +8,9 @@ NAME
 
 SYNOPSIS:
       python sodium.py help
-      python sodium.py [ -S ] [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry=MAX ] SYMBOL
-      python sodium.py scrape --apiUrl=API_URL --token=TOKEN [ --fromSymbol=SYMBOL ] [ --retry=MAX ] [ ALL | SYMBOL ]
+      python sodium.py [ -S ] [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ] SYMBOL
+      python sodium.py scrape --apiUrl=API_URL --token=TOKEN --source=SOURCE [ --retryMax=MAX ]
+                              SYMBOL | [ --fromSymbol=SYMBOL ] ALL
 
 OPTIONS:
                     (Default mode)
@@ -28,6 +29,7 @@ PARAMS:
       --directory   The download directory. Default: downloaded
 
                     (Scraping mode)
+      --source      Source of data
       --apiUrl      API url for sending requests
       --token       Authorization token
       --fromSymbol  Starting symbol
@@ -52,18 +54,16 @@ if __name__ == '__main__':
   elif 'scrape' in argv:
     apiUrl = get_param('apiUrl', options)
     token = get_param('token', options)
-    fromSymbol = get_param('fromSymbol', options)
+    source = get_param('source', options)
     retryMax = get_param('retryMax', options)
 
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
-    if len(argv) < 3:
-      print(description, '\n'*2)
+    targetSources = ['10JQKA', 'HKEX']
+    if source not in targetSources:
       print('WARNING:')
-      print('\tTarget should be provided.', '\n'*2)
+      print('\tSource should be provided, choosing from targetSources({}).'.format(', '.join(targetSources)))
       exit()
-    else:
-      target = argv[2]
 
     if apiUrl in [None, ''] or token in [None, '']:
       print(description, '\n'*2)
@@ -71,9 +71,21 @@ if __name__ == '__main__':
       print('\tApiUrl and token should be provided for sending POST requests.', '\n'*2)
       exit()
 
-    scraper = FinDataScraper(target, fromSymbol)
+    if len(argv) < 3:
+      print(description, '\n'*2)
+      print('WARNING:')
+      print('\tTarget should be provided.', '\n'*2)
+      exit()
+    else:
+      symbol = argv[2]
+      fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
+      
+    if source == '10JQKA':
+      scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
+    elif source == 'HKEX':
+      scraper = FinHKEX(apiUrl, token, retryMax, symbol, fromSymbol)
 
-    scraper.process(apiUrl, token, retryMax)
+    scraper.process()
   else:
     symbol = argv[1]
     skipDownload = '-S' in options
