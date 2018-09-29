@@ -9,11 +9,11 @@ NAME
 SYNOPSIS:
       python sodium.py help
       python sodium.py [ -S ] [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ] SYMBOL
-      python sodium.py scrape --apiUrl=API_URL --token=TOKEN --source=SOURCE [ --retryMax=MAX ]
+      python sodium.py scrape --apiUrl=API_URL --token=TOKEN --source=SOURCE --content=CONTENT [ --retryMax=MAX ]
                               SYMBOL | [ --fromSymbol=SYMBOL ] ALL
 
 OPTIONS:
-                    (Default mode)
+                    (Download mode)
       -S            Skip download process, usually because files have been downloaded.
       -t            Extract pages containing table(s) and merge for data analysis.
       -T            Provide a consolidated version of -t
@@ -25,11 +25,12 @@ PARAMS:
                     (Common)
       --retryMax    Number of retries made when failed to download the pdf from HKEX. Default: 3
 
-                    (Default mode)
+                    (Download mode)
       --directory   The download directory. Default: downloaded
 
                     (Scraping mode)
       --source      Source of data
+      --content     Content to scrape
       --apiUrl      API url for sending requests
       --token       Authorization token
       --fromSymbol  Starting symbol
@@ -55,6 +56,7 @@ if __name__ == '__main__':
     apiUrl = get_param('apiUrl', options)
     token = get_param('token', options)
     source = get_param('source', options)
+    content = get_param('content', options)
     retryMax = get_param('retryMax', options)
 
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
@@ -63,6 +65,12 @@ if __name__ == '__main__':
     if source not in targetSources:
       print('WARNING:')
       print('\tSource should be provided, choosing from targetSources({}).'.format(', '.join(targetSources)))
+      exit()
+    
+    if content not in ['both', 'company', 'financials']:
+      print(description, '\n'*2)
+      print('WARNING:')
+      print('\tContent to scrape should be provided.', '\n'*2)
       exit()
 
     if apiUrl in [None, ''] or token in [None, '']:
@@ -79,13 +87,19 @@ if __name__ == '__main__':
     else:
       symbol = argv[2]
       fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
-      
+
     if source == '10JQKA':
       scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
     elif source == 'HKEX':
       scraper = FinHKEX(apiUrl, token, retryMax, symbol, fromSymbol)
 
-    scraper.process()
+    if content == 'both':
+      scraper.process_financials()
+      scraper.process_company()
+    elif content == 'financials':
+      scraper.process_financials()
+    elif content == 'company':
+      scraper.process_company()
   else:
     symbol = argv[1]
     skipDownload = '-S' in options

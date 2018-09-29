@@ -25,17 +25,19 @@ class BasicTools:
     data = json.loads(json_string) if '{' in json_string and '}' in json_string else None
     if data:
       if 'errors' in data:
-        print('Response: {}'.format(data['errors']))
+        return False
       else:
         if informative:
           print('Success.')
-      return data
+        return data
     else:
       print('Error: {}'.format(json_string))
       return json_string
     
   def retrieve_all_symbols(self):           # Format: [symbol, companyName]
     self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
+
+    site = 'http://www.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
     headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
@@ -43,9 +45,15 @@ class BasicTools:
         'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
     }
-    site = 'http://www.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
 
-    response = self.session.get(site, headers=headers)
+    for i in range(self.retryMax):
+      try:
+        response = self.session.get(site, headers=headers)
+        break
+      except:
+        self.announce('Retrying again', wait=(i*10+randint(0,4)))
+        pass
+
     bs = BeautifulSoup(response.content, 'lxml')
     
     self.report('Data retrieved. Further processing...\n')
@@ -102,6 +110,7 @@ class FinDataScraper(BasicTools):
       'post': '/companies'
     }
 
+    site = '{}{}'.format(self.apiUrl, companyAPIs['get'])
     headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Token {}'.format(self.token)
@@ -109,28 +118,60 @@ class FinDataScraper(BasicTools):
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get('{}{}'.format(self.apiUrl, companyAPIs['get'], headers=headers))
+        response = self.session.get(site, headers=headers)
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
         pass
     
-    if self.log(response) == 'Unauthorized':
+    if self.log(response):
       self.announce('Creating company {} {}...'.format(companyName, symbol), wait=3)
+      
+      site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(self.region, symbol[-4:])
+      headers = {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept-Encoding': 'gzip, deflate',
+          'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
+      }
+
+      for i in range(self.retryMax):
+        try:
+          response = self.session.get(site, headers=headers))
+          break
+        except:
+          self.announce('Retrying again', wait=(i*10+randint(0,4)))
+          pass
+      
+      bs = BeautifulSoup(response.content, 'lxml')
+      target = bs.find('table', { 'class': 'm_table' }).select('td span')
+
+      companyFullName = target[0].get_text().strip()
+      website = target[10].get_text()
+
       data = {
         'company': {
           'symbol': symbol.lstrip('0'),
-          'name': companyName
+          'name': companyFullName,
+          'abbr': companyName,
+          'link': website
         }
       }
       json_company = json.dumps(data)
-      response = self.session.post('{}{}'.format(self.apiUrl, companyAPIs['post']), headers=headers, data=json_company)
-      self.log(response)
+      for i in range(self.retryMax):
+        try:
+          response = self.session.post('{}{}'.format(self.apiUrl, companyAPIs['post']), headers=headers, data=json_company)
+          break
+        except:
+          self.announce('Retrying again', wait=(i*10+randint(0,4)))
+          pass
       self.report('Company created.')
     else:
       self.report('Company existed.')
 
   def check_existed_financial_years(self, symbol):
+    site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
     headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Token {}'.format(self.token)
@@ -138,7 +179,7 @@ class FinDataScraper(BasicTools):
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get('{}{}'.format(self.apiUrl, self.financialAPI(symbol)), headers=headers)
+        response = self.session.get(site, headers=headers)
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -164,8 +205,9 @@ class Fin10JQKA(FinDataScraper):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
 
-  def process(self):
+  def process_financials(self):
     def get_all_statements(symbol, retryMax=self.retryMax):
+      site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
       headers = {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
@@ -176,7 +218,7 @@ class Fin10JQKA(FinDataScraper):
 
       for i in range(self.retryMax):
         try:
-          response = self.session.get('{}/{}{}/finance.html'.format(self.site, self.region, symbol), headers=headers)
+          response = self.session.get(site, headers=headers)
           break
         except:
           self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -275,7 +317,16 @@ class Fin10JQKA(FinDataScraper):
         for j, item in enumerate(self.position['title']):
           name = item[0]
           originalUnit = item[1]
+
           mapForPosition = {
+            '资产合计': 'totalAssets',
+            '负债合计': 'totalLiabilities'
+          }
+          if name in mapForPosition:
+            value = make_hundred_millions(self.position['report'][j][i], originalUnit)
+            financial['position'][mapForPosition[name]] = value
+
+          mapForDetailedPosition = {
             '现金及现金等价物': ['currentAssets', 'cash'],
             '应收账款': ['currentAssets', 'receivables'],
             '存货': ['currentAssets', 'inventory'],
@@ -284,15 +335,16 @@ class Fin10JQKA(FinDataScraper):
             '应交税费': ['currentLiabilities', 'tax'],
             '流动负债合计': ['currentLiabilities', 'total'],
             '不动产、厂房和设备': ['nonCurrentAssets', 'propertyPlantEquip'],
-            '资产合计': ['nonCurrentAssets', 'total'],    # minus 流动资产合计 (currentAssets)
+            # '非流动资产合计': ['nonCurrentAssets', 'total'],    Handled later
             '非流动负债合计': ['nonCurrentLiabilities', 'total'],
           }
-          if name in mapForPosition:
+          if name in mapForDetailedPosition:
             value = make_hundred_millions(self.position['report'][j][i], originalUnit)
-            financial['position'][mapForPosition[name][0]][mapForPosition[name][1]] = value
-        
-        if financial['position']['nonCurrentAssets']['total'] is not None and financial['position']['currentAssets']['total'] is not None:
-          financial['position']['nonCurrentAssets']['total'] = round(financial['position']['nonCurrentAssets']['total'] - financial['position']['currentAssets']['total'], 6)
+            financial['position'][mapForDetailedPosition[name][0]][mapForDetailedPosition[name][1]] = value
+
+        # nonCurrentAssets
+        if financial['position']['totalAssets'] is not None and financial['position']['currentAssets']['total'] is not None:
+          financial['position']['nonCurrentAssets']['total'] = round(financial['position']['totalAssets'] - financial['position']['currentAssets']['total'], 6)
 
         # Sort Cash Flow
         for j, item in enumerate(self.cashFlow['title']):
@@ -362,7 +414,7 @@ class FinHKEX(FinDataScraper):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for sharesOutstanding.'.format(symbol, self.site))
 
-  def process(self):
+  def process_financials(self):
     def get_sharesOutstanding(symbol):
       headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
