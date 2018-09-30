@@ -125,7 +125,7 @@ class FinDataScraper(BasicTools):
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
         pass
     
-    if self.log(response):
+    if not self.log(response):
       self.announce('Creating company {} {}...'.format(companyName, symbol), wait=3)
       
       site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(self.region, symbol[-4:])

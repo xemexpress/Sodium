@@ -81,8 +81,10 @@ if __name__ == '__main__':
       fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
 
     if source == '10JQKA':
+      # Scrape financials
       scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
     elif source == 'HKEX':
+      # Scrape sharesOutstanding on the latest financials
       scraper = FinHKEX(apiUrl, token, retryMax, symbol, fromSymbol)
 
     scraper.process()
