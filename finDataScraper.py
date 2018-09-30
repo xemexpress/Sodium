@@ -3,6 +3,7 @@ from random import randint
 import json
 import requests
 from bs4 import BeautifulSoup
+from hanziconv import HanziConv
 
 class BasicTools:
   session = requests.session()
@@ -138,7 +139,7 @@ class FinDataScraper(BasicTools):
 
       for i in range(self.retryMax):
         try:
-          response = self.session.get(site, headers=headers))
+          response = self.session.get(site, headers=headers)
           break
         except:
           self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -147,7 +148,7 @@ class FinDataScraper(BasicTools):
       bs = BeautifulSoup(response.content, 'lxml')
       target = bs.find('table', { 'class': 'm_table' }).select('td span')
 
-      companyFullName = target[0].get_text().strip()
+      companyFullName = HanziConv.toTraditional(target[0].get_text().strip())
       website = target[10].get_text()
 
       data = {
@@ -155,13 +156,20 @@ class FinDataScraper(BasicTools):
           'symbol': symbol.lstrip('0'),
           'name': companyFullName,
           'abbr': companyName,
-          'link': website
+          'link': 'http://{}'.format(website)
         }
       }
       json_company = json.dumps(data)
+      
+      site = '{}{}'.format(self.apiUrl, companyAPIs['post'])
+      headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Token {}'.format(self.token)
+      }
+
       for i in range(self.retryMax):
         try:
-          response = self.session.post('{}{}'.format(self.apiUrl, companyAPIs['post']), headers=headers, data=json_company)
+          response = self.session.post(site, headers=headers, data=json_company)
           break
         except:
           self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -205,7 +213,7 @@ class Fin10JQKA(FinDataScraper):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
 
-  def process_financials(self):
+  def process(self):
     def get_all_statements(symbol, retryMax=self.retryMax):
       site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
       headers = {
@@ -387,13 +395,12 @@ class Fin10JQKA(FinDataScraper):
 
           # Check if the financial of the year already exists
           existed = financial['year'] in self.existedFinancialYears
+          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'])) if existed else '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
+          
           self.report('{}: {} financial {}'.format(companyName, 'Updating' if existed else 'Posting', financial['year']))
           for i in range(self.retryMax):
             try:
-              if existed:
-                response = self.session.put('{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'])), headers=headers, data=json_string)
-              else:
-                response = self.session.post('{}{}'.format(self.apiUrl, self.financialAPI(symbol)), headers=headers, data=json_string)
+              response = self.session.put(site, headers=headers, data=json_string) if existed else self.session.post(site, headers=headers, data=json_string)
               break
             except:
               self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -414,7 +421,7 @@ class FinHKEX(FinDataScraper):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for sharesOutstanding.'.format(symbol, self.site))
 
-  def process_financials(self):
+  def process(self):
     def get_sharesOutstanding(symbol):
       headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',

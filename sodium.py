@@ -93,13 +93,7 @@ if __name__ == '__main__':
     elif source == 'HKEX':
       scraper = FinHKEX(apiUrl, token, retryMax, symbol, fromSymbol)
 
-    if content == 'both':
-      scraper.process_financials()
-      scraper.process_company()
-    elif content == 'financials':
-      scraper.process_financials()
-    elif content == 'company':
-      scraper.process_company()
+    scraper.process()
   else:
     symbol = argv[1]
     skipDownload = '-S' in options
