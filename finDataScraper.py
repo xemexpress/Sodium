@@ -26,14 +26,14 @@ class BasicTools:
     data = json.loads(json_string) if '{' in json_string and '}' in json_string else None
     if data:
       if 'errors' in data:
-        return False
+        return { 'state': False, 'data': data['errors'] }
       else:
         if informative:
           print('Success.')
-        return data
+        return { 'state': True, 'data': data }
     else:
       print('Error: {}'.format(json_string))
-      return json_string
+      return { 'state': False, 'data': json_string }
     
   def retrieve_all_symbols(self):           # Format: [symbol, companyName]
     self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
@@ -125,7 +125,7 @@ class FinDataScraper(BasicTools):
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
         pass
     
-    if not self.log(response):
+    if not self.log(response)['state']:
       self.announce('Creating company {} {}...'.format(companyName, symbol), wait=3)
       
       site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(self.region, symbol[-4:])
@@ -193,7 +193,7 @@ class FinDataScraper(BasicTools):
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
         pass
     
-    response = self.log(response, informative=False)
+    response = self.log(response, informative=False)['data']
     self.existedFinancialYears = response['financials'] if 'financials' in response else []
     self.existedFinancialYears = list(map(lambda financial: financial['year'], self.existedFinancialYears))
 
