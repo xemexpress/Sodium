@@ -64,7 +64,7 @@ if __name__ == '__main__':
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
     targetSources = ['10JQKA', 'HKEX']
-    if source not in targetSources:
+    if source not in targetSources and not needAdjustments:
       print('WARNING:')
       print('\tSource should be provided, choosing from targetSources({}).'.format(', '.join(targetSources)))
       exit()
