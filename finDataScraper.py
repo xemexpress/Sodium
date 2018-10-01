@@ -519,7 +519,7 @@ class FinAdapter(FinDataScraper):
 
   def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
-    self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
+    self.report('Task:\n\tTarget {} from {} for cashFlow.'.format(symbol, self.site))
 
   def get_all_statements(self, symbol, retryMax):
     site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
@@ -603,8 +603,8 @@ class FinAdapter(FinDataScraper):
           json_string = json.dumps(data)
 
           # Check if the financial of the year already exists
-          existed = financial['year'] in self.existedFinancialYears
-          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'])) if existed else '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
+          existed = financial['year'][:8] in self.existedFinancialYears
+          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'][:8])) if existed else '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
           
           self.report('{}: {} financial {}'.format(companyName, 'Updating' if existed else 'Posting', financial['year']))
           for i in range(self.retryMax):
