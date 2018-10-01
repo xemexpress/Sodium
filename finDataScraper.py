@@ -587,7 +587,7 @@ class FinAdapter(FinDataScraper):
     }
 
     for symbol, companyName in self.symbols:
-      self.announce('{}: Getting resonance, position, cashFlow statements'.format(companyName), wait=(7+randint(0,4)))
+      self.announce('{}: Getting cashFlow statement'.format(companyName), wait=(7+randint(0,4)))
       if self.get_all_statements(symbol[1:], retryMax=self.retryMax):
         # Ensure the company has been created.
         self.ensure_company(symbol, companyName)
