@@ -1,5 +1,5 @@
 from sys import argv
-from finDataScraper import Fin10JQKA, FinHKEX
+from finDataScraper import Fin10JQKA, FinHKEX, FinAdapter
 from finReportHandler import FinReportHandler
 
 description = """
@@ -9,7 +9,7 @@ NAME
 SYNOPSIS:
       python sodium.py help
       python sodium.py [ -S ] [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ] SYMBOL
-      python sodium.py scrape --apiUrl=API_URL --token=TOKEN --source=SOURCE [ --retryMax=MAX ]
+      python sodium.py scrape --apiUrl=API_URL --token=TOKEN [ -a | --source=SOURCE ] [ --retryMax=MAX ]
                               SYMBOL | [ --fromSymbol=SYMBOL ] ALL
 
 OPTIONS:
@@ -21,6 +21,9 @@ OPTIONS:
       -m            Merge downloaded financial reports for further studies.
       -C            Clean up downloaded financial reports.
 
+                    (Scrape mode)
+      -a            Adjust structural data
+
 PARAMS:
                     (Common)
       --retryMax    Number of retries made when failed to download the pdf from HKEX. Default: 3
@@ -28,7 +31,7 @@ PARAMS:
                     (Download mode)
       --directory   The download directory. Default: downloaded
 
-                    (Scraping mode)
+                    (Scrape mode)
       --source      Source of data
       --apiUrl      API url for sending requests
       --token       Authorization token
@@ -52,9 +55,10 @@ if __name__ == '__main__':
   if 'help' in argv or len(argv) is 1:
     print(description)
   elif 'scrape' in argv:
+    needAdjustments = '-a' in options
     apiUrl = get_param('apiUrl', options)
     token = get_param('token', options)
-    source = get_param('source', options)
+    source = get_param('source', options) if not needAdjustments else None
     retryMax = get_param('retryMax', options)
 
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
@@ -80,13 +84,15 @@ if __name__ == '__main__':
       symbol = argv[2]
       fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
 
-    if source == '10JQKA':
+    if needAdjustments:
+      scraper = FinAdapter(apiUrl, token, retryMax, symbol, fromSymbol)
+    elif source == '10JQKA':
       # Scrape financials
       scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
     elif source == 'HKEX':
       # Scrape sharesOutstanding on the latest financials
       scraper = FinHKEX(apiUrl, token, retryMax, symbol, fromSymbol)
-
+    
     scraper.process()
   else:
     symbol = argv[1]

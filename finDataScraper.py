@@ -197,6 +197,16 @@ class FinDataScraper(BasicTools):
     self.existedFinancialYears = response['financials'] if 'financials' in response else []
     self.existedFinancialYears = list(map(lambda financial: financial['year'], self.existedFinancialYears))
 
+  def make_hundred_millions(self, value, originalUnit):
+    if value is not '':
+      value = float(value)
+      if originalUnit.startswith('万'):
+        value = value * 10000
+      value = round(value / 100000000, 6)
+      return value
+    else:
+      return None
+
   def financialAPI(self, symbol, year=None):
     return '/companies/{}/financials{}'.format(symbol.lstrip('0'), '/{}'.format(year) if year is not None else '')
 
@@ -208,168 +218,163 @@ class Fin10JQKA(FinDataScraper):
   position = None
   cashFlow = None
   financials = []
+  year_sigs = []
 
   def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
 
-  def process(self):
-    def get_all_statements(symbol, retryMax=self.retryMax):
-      site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
-      headers = {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept-Encoding': 'gzip, deflate',
-          'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
+  def get_all_statements(self, symbol, retryMax):
+    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
+    headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
+    }
+
+    for i in range(self.retryMax):
+      try:
+        response = self.session.get(site, headers=headers)
+        break
+      except:
+        self.announce('Retrying again', wait=(i*10+randint(0,4)))
+        pass
+
+    self.report('Online source retrieved. Now getting into the data...')
+    bs = BeautifulSoup(response.content, 'lxml')
+    if bs.find(id='benefit'):
+      self.resonance = json.loads(bs.find(id='benefit').get_text())
+      self.report('利潤表 retrieved.')
+      self.position = json.loads(bs.find(id='debt').get_text())
+      self.report('資產負債表 retrieved.')
+      self.cashFlow = json.loads(bs.find(id='cash').get_text())
+      self.report('現金流量表 retrieved.')
+      return True
+    else:
+      return None
+
+  def sort_financials(self):
+    # Get Periods Ready
+    self.report('Retrieving periods...')
+    report_periods = self.cashFlow['report'][0]
+    year_periods = self.cashFlow['year'][0]
+
+    # Get Statements Clear
+    self.report('Processing all statements...')
+    # Processing 利潤表
+    self.resonance['title'] = self.resonance['title'][1:]
+    self.resonance['report'] = self.resonance['report'][1:]
+
+    # Processing 資產負債表
+    self.position['title'] = self.position['title'][1:]
+    self.position['report'] = self.position['report'][1:]
+    
+    # Processing 現金流量表
+    self.cashFlow['title'] = self.cashFlow['title'][1:]
+    self.cashFlow['report'] = self.cashFlow['report'][1:]
+    self.cashFlow['year'] = self.cashFlow['year'][1:]
+
+    # Reset financials and year signatures
+    self.financials = []
+    self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
+
+    # Create financial dictionaries one by one
+    for i, period in enumerate(report_periods):
+      financial = {
+        'year': period.replace('-', ''),
+        'currency': '',
+        'resonance': {},
+        'position': {
+          'currentAssets': {},
+          'currentLiabilities': {},
+          'nonCurrentAssets': {},
+          'nonCurrentLiabilities': {}
+        },
+        'cashFlow': {}
       }
-
-      for i in range(self.retryMax):
-        try:
-          response = self.session.get(site, headers=headers)
-          break
-        except:
-          self.announce('Retrying again', wait=(i*10+randint(0,4)))
-          pass
-
-      self.report('Online source retrieved. Now getting into the data...')
-      bs = BeautifulSoup(response.content, 'lxml')
-      if bs.find(id='benefit'):
-        self.resonance = json.loads(bs.find(id='benefit').get_text())
-        self.report('利潤表 retrieved.')
-        self.position = json.loads(bs.find(id='debt').get_text())
-        self.report('資產負債表 retrieved.')
-        self.cashFlow = json.loads(bs.find(id='cash').get_text())
-        self.report('現金流量表 retrieved.')
-        return True
-      else:
-        return None
-
-    def sort_financials():
-      # Helper Functions
-      def make_hundred_millions(value, originalUnit):
-        if value is not '':
-          value = float(value)
-          if originalUnit.startswith('万'):
-            value = value * 10000
-          value = value / 100000000
-          return value
-        else:
-          return None
       
-      # Reset financials
-      self.financials = []
+      # Mark Currency
+      sampleUnit = self.resonance['title'][0][1]
+      if sampleUnit.endswith('港元'):
+        financial['currency'] = '億HKD'
+      elif sampleUnit.endswith('美元'):
+        financial['currency'] = '億USD'
+      elif sampleUnit.endswith('元'):
+        financial['currency'] = '億RMB'
+      print('Currency unit: {}'.format(financial['currency']))
       
-      # Get Periods Ready
-      self.report('Retrieving periods...')
-      periods = self.resonance["report"][0]
-
-      # Get Statements Clear
-      self.report('Processing all statements...')
-      # Processing 利潤表
-      self.resonance['title'] = self.resonance['title'][1:]
-      self.resonance['report'] = self.resonance['report'][1:]
-
-      # Processing 資產負債表
-      self.position['title'] = self.position['title'][1:]
-      self.position['report'] = self.position['report'][1:]
-      
-      # Processing 現金流量表
-      self.cashFlow['title'] = self.cashFlow['title'][1:]
-      self.cashFlow['report'] = self.cashFlow['report'][1:]
-
-      # Create financial dictionaries one by one
-      for i, period in enumerate(periods):
-        financial = {
-          'year': period.replace('-', ''),
-          'currency': '',
-          'resonance': {},
-          'position': {
-            'currentAssets': {},
-            'currentLiabilities': {},
-            'nonCurrentAssets': {},
-            'nonCurrentLiabilities': {}
-          },
-          'cashFlow': {}
+      # Sort Cash Flow
+      for j, item in enumerate(self.cashFlow['title']):
+        name = item[0]
+        originalUnit = item[1]
+        mapForCashFlow = {
+          '经营流动现金流量净额': 'netOperating',
+          '投资活动现金流量净额': 'netInvesting',
+          '融资活动现金流量净额': 'netFinancing'
         }
-        
-        # Mark Currency
-        sampleUnit = self.resonance['title'][0][1]
-        if sampleUnit.endswith('港元'):
-          financial['currency'] = '億HKD'
-        elif sampleUnit.endswith('美元'):
-          financial['currency'] = '億USD'
-        elif sampleUnit.endswith('元'):
-          financial['currency'] = '億RMB'
-        print('Currency unit: {}'.format(financial['currency']))
+        if name in mapForCashFlow:
+          if j == 1 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
+            financial['year'] += 'Y'
+          value = self.make_hundred_millions(self.cashFlow['report'][j][i], originalUnit)
+          financial['cashFlow'][mapForCashFlow[name]] = value
 
-        # Sort Resonance
-        for j, item in enumerate(self.resonance['title']):
-          name = item[0]
-          originalUnit = item[1]
-          mapForResonance = {
-            '营业额': 'revenue',
-            '销售费用': 'sellingExpense',
-            '销售成本': 'salesCost',
-            '管理费用': 'adminCost',
-            '财务费用': 'financingCost',
-            '其它收入': 'otherRevenues',
-            '税前利润': 'profitBeforeTax',
-            '归属母公司股东利润': 'profit'
-          }
-          if name in mapForResonance:
-            value = make_hundred_millions(self.resonance['report'][j][i], originalUnit)
-            financial['resonance'][mapForResonance[name]] = value
-        
-        # Sort Position
-        for j, item in enumerate(self.position['title']):
-          name = item[0]
-          originalUnit = item[1]
+      # Sort Resonance
+      for j, item in enumerate(self.resonance['title']):
+        name = item[0]
+        originalUnit = item[1]
+        mapForResonance = {
+          '营业额': 'revenue',
+          '销售费用': 'sellingExpense',
+          '销售成本': 'salesCost',
+          '管理费用': 'adminCost',
+          '财务费用': 'financingCost',
+          '其它收入': 'otherRevenues',
+          '税前利润': 'profitBeforeTax',
+          '归属母公司股东利润': 'profit'
+        }
+        if name in mapForResonance:
+          value = self.make_hundred_millions(self.resonance['report'][j][i], originalUnit)
+          financial['resonance'][mapForResonance[name]] = value
+      
+      # Sort Position
+      for j, item in enumerate(self.position['title']):
+        name = item[0]
+        originalUnit = item[1]
 
-          mapForPosition = {
-            '资产合计': 'totalAssets',
-            '负债合计': 'totalLiabilities'
-          }
-          if name in mapForPosition:
-            value = make_hundred_millions(self.position['report'][j][i], originalUnit)
-            financial['position'][mapForPosition[name]] = value
+        mapForPosition = {
+          '资产合计': 'totalAssets',
+          '负债合计': 'totalLiabilities'
+        }
+        if name in mapForPosition:
+          value = self.make_hundred_millions(self.position['report'][j][i], originalUnit)
+          financial['position'][mapForPosition[name]] = value
 
-          mapForDetailedPosition = {
-            '现金及现金等价物': ['currentAssets', 'cash'],
-            '应收账款': ['currentAssets', 'receivables'],
-            '存货': ['currentAssets', 'inventory'],
-            '流动资产合计': ['currentAssets', 'total'],
-            '应付账款': ['currentLiabilities', 'payables'],
-            '应交税费': ['currentLiabilities', 'tax'],
-            '流动负债合计': ['currentLiabilities', 'total'],
-            '不动产、厂房和设备': ['nonCurrentAssets', 'propertyPlantEquip'],
-            # '非流动资产合计': ['nonCurrentAssets', 'total'],    Handled later
-            '非流动负债合计': ['nonCurrentLiabilities', 'total'],
-          }
-          if name in mapForDetailedPosition:
-            value = make_hundred_millions(self.position['report'][j][i], originalUnit)
-            financial['position'][mapForDetailedPosition[name][0]][mapForDetailedPosition[name][1]] = value
+        mapForDetailedPosition = {
+          '现金及现金等价物': ['currentAssets', 'cash'],
+          '应收账款': ['currentAssets', 'receivables'],
+          '存货': ['currentAssets', 'inventory'],
+          '流动资产合计': ['currentAssets', 'total'],
+          '应付账款': ['currentLiabilities', 'payables'],
+          '应交税费': ['currentLiabilities', 'tax'],
+          '流动负债合计': ['currentLiabilities', 'total'],
+          '不动产、厂房和设备': ['nonCurrentAssets', 'propertyPlantEquip'],
+          # '非流动资产合计': ['nonCurrentAssets', 'total'],    Handled later
+          '非流动负债合计': ['nonCurrentLiabilities', 'total'],
+        }
+        if name in mapForDetailedPosition:
+          value = self.make_hundred_millions(self.position['report'][j][i], originalUnit)
+          financial['position'][mapForDetailedPosition[name][0]][mapForDetailedPosition[name][1]] = value
 
-        # nonCurrentAssets
-        if financial['position']['totalAssets'] is not None and financial['position']['currentAssets']['total'] is not None:
-          financial['position']['nonCurrentAssets']['total'] = round(financial['position']['totalAssets'] - financial['position']['currentAssets']['total'], 6)
+      # nonCurrentAssets
+      if financial['position']['totalAssets'] is not None and financial['position']['currentAssets']['total'] is not None:
+        financial['position']['nonCurrentAssets']['total'] = round(financial['position']['totalAssets'] - financial['position']['currentAssets']['total'], 6)
 
-        # Sort Cash Flow
-        for j, item in enumerate(self.cashFlow['title']):
-          name = item[0]
-          originalUnit = item[1]
-          mapForCashFlow = {
-            '经营流动现金流量净额': 'netOperating',
-            '投资活动现金流量净额': 'netInvesting',
-            '融资活动现金流量净额': 'netFinancing'
-          }
-          if name in mapForCashFlow:
-            value = make_hundred_millions(self.cashFlow['report'][j][i], originalUnit)
-            financial['cashFlow'][mapForCashFlow[name]] = value
+      self.report('Data of {} loaded.'.format(financial['year']))
+      self.financials.append(financial)
 
-        self.report('Data of {} loaded.'.format(financial['year']))
-        self.financials.append(financial)
-
+  def process(self):
     self.announce('Start scraping resonance, position and cashFlow!', skip=7)
     
     headers = {
@@ -379,12 +384,12 @@ class Fin10JQKA(FinDataScraper):
 
     for symbol, companyName in self.symbols:
       self.announce('{}: Getting resonance, position, cashFlow statements'.format(companyName), wait=(7+randint(0,4)))
-      if get_all_statements(symbol[1:]):
+      if self.get_all_statements(symbol[1:], retryMax=self.retryMax):
         # Ensure the company has been created.
         self.ensure_company(symbol, companyName)
 
         # Sort self.resonance, self.position and self.cashFlow into self.financials
-        sort_financials()
+        self.sort_financials()
 
         self.check_existed_financial_years(symbol)
 
@@ -471,7 +476,7 @@ class FinHKEX(FinDataScraper):
         self.sharesOutstanding = int(target.get_text().lstrip().replace(',', ''))
         return True
       else:
-        return None
+        return False
       
     self.announce('Start scraping sharesOutstanding!', skip=7)
 
@@ -502,4 +507,116 @@ class FinHKEX(FinDataScraper):
           print('Failed to get the latest sharesOutstanding of {} {}. Skip.'.format(companyName, symbol))
       else:
         print('Basic informations about {} {} do not exist. Skip.'.format(companyName, symbol))
+    print('Processing Completed.')
+
+class FinAdapter(FinDataScraper):
+  site = 'http://basic.10jqka.com.cn'
+  region = 'HK'
+
+  cashFlow = None
+  financials = []
+  year_sigs = []
+
+  def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
+    super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
+    self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
+
+  def get_all_statements(self, symbol, retryMax):
+    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
+    headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
+    }
+
+    for i in range(self.retryMax):
+      try:
+        response = self.session.get(site, headers=headers)
+        break
+      except:
+        self.announce('Retrying again', wait=(i*10+randint(0,4)))
+        pass
+
+    self.report('Online source retrieved. Now getting into the data...')
+    bs = BeautifulSoup(response.content, 'lxml')
+    if bs.find(id='cash'):
+      self.cashFlow = json.loads(bs.find(id='cash').get_text())
+      self.report('現金流量表 retrieved.')
+      return True
+    else:
+      return None
+
+  def sort_financials(self):
+    # Get Periods Ready
+    self.report('Retrieving periods...')
+    report_periods = self.cashFlow['report'][0]
+    year_periods = self.cashFlow['year'][0]
+
+    # Get Statements Clear
+    self.report('Processing...')
+    # Processing 現金流量表
+    self.cashFlow['title'] = self.cashFlow['title'][1:]
+    self.cashFlow['report'] = self.cashFlow['report'][1:]
+    self.cashFlow['year'] = self.cashFlow['year'][1:]
+
+    # Reset financials and year signatures
+    self.financials = []
+    self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
+
+    # Create financial dictionaries one by one
+    for i, period in enumerate(report_periods):
+      financial = {
+        'year': period.replace('-', '')
+      }
+      # Sort Cash Flow
+      for j, item in enumerate(self.cashFlow['title']):
+        if j == 1 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
+          financial['year'] += 'Y'
+
+      self.report('Data of {} loaded.'.format(financial['year']))
+      self.financials.append(financial)
+
+  def process(self):
+    self.announce('Start scraping cashFlow for updating year!', skip=7)
+    
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Token {}'.format(self.token)
+    }
+
+    for symbol, companyName in self.symbols:
+      self.announce('{}: Getting resonance, position, cashFlow statements'.format(companyName), wait=(7+randint(0,4)))
+      if self.get_all_statements(symbol[1:], retryMax=self.retryMax):
+        # Ensure the company has been created.
+        self.ensure_company(symbol, companyName)
+
+        # Sort self.cashFlow into self.financials
+        self.sort_financials()
+
+        self.check_existed_financial_years(symbol)
+
+        # Upload self.financials   
+        for financial in self.financials:
+          data = { 'financial': financial }
+          json_string = json.dumps(data)
+
+          # Check if the financial of the year already exists
+          existed = financial['year'] in self.existedFinancialYears
+          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'])) if existed else '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
+          
+          self.report('{}: {} financial {}'.format(companyName, 'Updating' if existed else 'Posting', financial['year']))
+          for i in range(self.retryMax):
+            try:
+              response = self.session.put(site, headers=headers, data=json_string) if existed else self.session.post(site, headers=headers, data=json_string)
+              break
+            except:
+              self.announce('Retrying again', wait=(i*10+randint(0,4)))
+              pass
+          self.log(response)
+        self.announce('Uploads for {} completed.'.format(companyName), skip=3)
+      else:
+        self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
+        self.announce('Skip', skip=3)
     print('Processing Completed.')
