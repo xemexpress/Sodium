@@ -278,7 +278,8 @@ class Fin10JQKA(FinDataScraper):
 
     # Reset financials and year signatures
     self.financials = []
-    self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
+    if year_periods is not None:
+      self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
 
     # Create financial dictionaries one by one
     for i, period in enumerate(report_periods):
@@ -315,7 +316,7 @@ class Fin10JQKA(FinDataScraper):
           '融资活动现金流量净额': 'netFinancing'
         }
         if name in mapForCashFlow:
-          if j == 1 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
+          if j == 1 and len(self.year_sigs) != 0 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
             financial['year'] += 'Y'
           value = self.make_hundred_millions(self.cashFlow['report'][j][i], originalUnit)
           financial['cashFlow'][mapForCashFlow[name]] = value
@@ -563,7 +564,8 @@ class FinAdapter(FinDataScraper):
 
     # Reset financials and year signatures
     self.financials = []
-    self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
+    if year_periods is not None:
+      self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
 
     # Create financial dictionaries one by one
     for i, period in enumerate(report_periods):
@@ -572,7 +574,7 @@ class FinAdapter(FinDataScraper):
       }
       # Sort Cash Flow
       for j, item in enumerate(self.cashFlow['title']):
-        if j == 1 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
+        if j == 1 and len(self.year_sigs) != 0 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
           financial['year'] += 'Y'
 
       self.report('Data of {} loaded.'.format(financial['year']))
@@ -603,19 +605,18 @@ class FinAdapter(FinDataScraper):
           json_string = json.dumps(data)
 
           # Check if the financial of the year already exists
-          existed = financial['year'][:8] in self.existedFinancialYears
-          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'][:8])) if existed else '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
+          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'][:8]))
           
-          self.report('{}: {} financial {}'.format(companyName, 'Updating' if existed else 'Posting', financial['year']))
+          self.report('{}: {} financial {} to {}'.format(companyName, 'Updating', financial['year'][:8], financial['year']))
           for i in range(self.retryMax):
             try:
-              response = self.session.put(site, headers=headers, data=json_string) if existed else self.session.post(site, headers=headers, data=json_string)
+              response = self.session.put(site, headers=headers, data=json_string)
               break
             except:
               self.announce('Retrying again', wait=(i*10+randint(0,4)))
               pass
           self.log(response)
-        self.announce('Uploads for {} completed.'.format(companyName), skip=3)
+        self.announce('Uploads for {} {} completed.'.format(companyName, symbol), skip=3)
       else:
         self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
         self.announce('Skip', skip=3)
