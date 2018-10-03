@@ -59,7 +59,7 @@ class BasicTools:
     
     self.report('Data retrieved. Further processing...\n')
     result = bs.select("[class^=TableContentStyle]")
-    result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3'], result))
+    result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], result))
     result = list(map(lambda x: [x.contents[0].get_text(), x.contents[1].get_text()], result))
     self.announce('Data are already formatted in form of [symbol, companyName]', skip=7)
     return result
@@ -217,6 +217,8 @@ class Fin10JQKA(FinDataScraper):
   resonance = None
   position = None
   cashFlow = None
+  equityRecords = []
+  
   financials = []
   year_sigs = []
 
@@ -225,7 +227,7 @@ class Fin10JQKA(FinDataScraper):
     self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
 
   def get_all_statements(self, symbol, retryMax):
-    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
+    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol[1:])
     headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
@@ -254,6 +256,54 @@ class Fin10JQKA(FinDataScraper):
       return True
     else:
       return None
+
+  def get_equity_records(self, symbol, retryMax):
+    # Reset equityRecords
+    self.equityRecords = []
+
+    site = '{}/{}{}/equity.html'.format(self.site, self.region, symbol[1:])
+    headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
+    }
+
+    for i in range(self.retryMax):
+      try:
+        response = self.session.get(site, headers=headers)
+        break
+      except:
+        self.announce('Retrying again', wait=(i*10+randint(0,4)))
+        pass
+
+    self.report('Equity records retrieved. Now getting into the data...')
+    bs = BeautifulSoup(response.content, 'lxml')
+
+    unit = bs.find('p', { 'class': 'p5_0 tr' }).get_text()[-3:]
+    print('Equity unit:', unit)
+
+    if unit == '百万股':
+      target = bs.find('div', { 'id': 'change' })
+      table = target.find('table', { 'class': 'm_table m_hl' })
+
+      changes = table.find_all('tr')
+      for change in changes:
+        items = change.find_all('td')
+        date = None
+        equity = 1
+        for i, item in enumerate(items):
+          if i == 1:
+            equity = int(float(item.get_text().strip())*1000000)
+          elif i == 3:
+            date = item.get_text().strip().replace('-', '')
+        if date is not None:
+          self.equityRecords.append((date, equity))
+
+    else:
+      print('Another unit is found:', unit)
+      exit()
 
   def sort_financials(self):
     # Get Periods Ready
@@ -285,6 +335,7 @@ class Fin10JQKA(FinDataScraper):
     for i, period in enumerate(report_periods):
       financial = {
         'year': period.replace('-', ''),
+        'sharesOutstanding': 1,
         'currency': '',
         'resonance': {},
         'position': {
@@ -375,6 +426,13 @@ class Fin10JQKA(FinDataScraper):
       self.report('Data of {} loaded.'.format(financial['year']))
       self.financials.append(financial)
 
+  def sort_shares_outstanding(self):
+    for i, financial in enumerate(self.financials):
+      for date, equity in self.equityRecords:
+        if financial['year'][:8] >= date:
+          self.financials[i]['sharesOutstanding'] = equity
+          break
+
   def process(self):
     self.announce('Start scraping resonance, position and cashFlow!', skip=7)
     
@@ -385,12 +443,18 @@ class Fin10JQKA(FinDataScraper):
 
     for symbol, companyName in self.symbols:
       self.announce('{}: Getting resonance, position, cashFlow statements'.format(companyName), wait=(7+randint(0,4)))
-      if self.get_all_statements(symbol[1:], retryMax=self.retryMax):
+      if self.get_all_statements(symbol, retryMax=self.retryMax):
         # Ensure the company has been created.
         self.ensure_company(symbol, companyName)
 
+        # Get equity records
+        self.get_equity_records(symbol, retryMax=self.retryMax)
+
         # Sort self.resonance, self.position and self.cashFlow into self.financials
         self.sort_financials()
+
+        # Sort respective sharesOutstanding
+        self.sort_shares_outstanding()
 
         self.check_existed_financial_years(symbol)
 
@@ -523,7 +587,7 @@ class FinAdapter(FinDataScraper):
     self.report('Task:\n\tTarget {} from {} for cashFlow.'.format(symbol, self.site))
 
   def get_all_statements(self, symbol, retryMax):
-    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol)
+    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol[1:])
     headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
@@ -590,7 +654,7 @@ class FinAdapter(FinDataScraper):
 
     for symbol, companyName in self.symbols:
       self.announce('{}: Getting cashFlow statement'.format(companyName), wait=(7+randint(0,4)))
-      if self.get_all_statements(symbol[1:], retryMax=self.retryMax):
+      if self.get_all_statements(symbol, retryMax=self.retryMax):
         # Ensure the company has been created.
         self.ensure_company(symbol, companyName)
 
@@ -598,7 +662,7 @@ class FinAdapter(FinDataScraper):
         self.sort_financials()
 
         self.check_existed_financial_years(symbol)
-
+        
         # Upload self.financials   
         for financial in self.financials:
           data = { 'financial': financial }
