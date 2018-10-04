@@ -328,10 +328,8 @@ class Fin10JQKA(FinDataScraper):
       bs = BeautifulSoup(response.content, 'lxml')
 
       holder_change_record = bs.find('table', { 'class': 'mt15 m_table m_hl'})
-      unit_target = holder_change_record.select('thead th')
-
-      if len(unit_target) != 0:
-        unit_target = unit_target[3].get_text()
+      if holder_change_record is not None:
+        unit_target = holder_change_record.select('thead th')[3].get_text()
         unit = unit_target[unit_target.find('(')+1 : unit_target.find(')')]
 
         if unit == '万股':
@@ -351,7 +349,7 @@ class Fin10JQKA(FinDataScraper):
           print('Another unit is found:', unit)
           exit()
       else:
-        print('Another situation happened.')
+        print('holder_change_record is not found as expected. Please go check.')
         exit()
 
   def sort_financials(self):
