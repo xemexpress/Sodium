@@ -330,7 +330,7 @@ class Fin10JQKA(FinDataScraper):
       holder_change_record = bs.find('table', { 'class': 'mt15 m_table m_hl'})
       unit_target = holder_change_record.select('thead th')
 
-      if unit_target is not None:
+      if len(unit_target) != 0:
         unit_target = unit_target[3].get_text()
         unit = unit_target[unit_target.find('(')+1 : unit_target.find(')')]
 
