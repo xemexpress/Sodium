@@ -309,7 +309,7 @@ class Fin10JQKA(FinDataScraper):
     else:
       self.catched.append(symbol)
       self.report('Equity records retrieved is not as expected. Catched. Now getting into another set of data...')
-      site = 'http://{}/{}{}/holder.html'.format(self.site, self.region, symbol[1:])
+      site = '{}/{}{}/holder.html'.format(self.site, self.region, symbol[1:])
 
       for i in range(self.retryMax):
         try:
