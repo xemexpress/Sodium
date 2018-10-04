@@ -115,12 +115,12 @@ class FinDataScraper(BasicTools):
     print("{} can't be found. Please check.".format(symbol))
     exit()
 
-  def send_alert(self, symbol):
+  def send_alert(self, subject, symbol):
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls() 
     s.login(sender_email, sender_password)
     msg = MIMEText('Symbol: {}\n\n'.format(symbol))
-    msg['Subject'] = 'Equity Search Alert'
+    msg['Subject'] = subject
     msg['From'] = sender_email
     msg['To'] = receiver_email
     s.send_message(msg)
@@ -392,7 +392,7 @@ class Fin10JQKA(FinDataScraper):
           for i, date in enumerate(dates):
             self.equityRecords.append((date, equities[i]))
         else:
-          self.send_alert(symbol)
+          self.send_alert('Equity Search Alert', symbol)
 
   def sort_financials(self):
     # Get Periods Ready
