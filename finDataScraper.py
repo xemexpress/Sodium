@@ -1,5 +1,6 @@
 import time
 from random import randint
+from math import floor, log10
 import json
 import requests
 from bs4 import BeautifulSoup
@@ -63,6 +64,12 @@ class BasicTools:
     result = list(map(lambda x: [x.contents[0].get_text(), x.contents[1].get_text()], result))
     self.announce('Data are already formatted in form of [symbol, companyName]', skip=7)
     return result
+
+  def round_sigfigs(self, num, sig_figs):
+    if num != 0:
+      return round(num, -int(floor(log10(abs(num))) - (sig_figs - 1)))
+    else:
+      return 0
 
 class FinDataScraper(BasicTools):
   apiUrl = ''
@@ -333,7 +340,7 @@ class Fin10JQKA(FinDataScraper):
 
           part = float(items[2].get_text()) * 10000
           percentage = float(items[3].get_text()) / 100
-          equity = int(round_sigfigs(part/percentage, 3))
+          equity = int(self.round_sigfigs(part/percentage, 3))
           if date != prev_date:
             self.equityRecords.append((date, equity))
             prev_date = date
