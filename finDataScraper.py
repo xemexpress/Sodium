@@ -392,7 +392,7 @@ class Fin10JQKA(FinDataScraper):
           for i, date in enumerate(dates):
             self.equityRecords.append((date, equities[i]))
         else:
-          send_alert(symbol)
+          self.send_alert(symbol)
 
   def sort_financials(self):
     # Get Periods Ready
