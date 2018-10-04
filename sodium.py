@@ -1,6 +1,7 @@
 from sys import argv
 from finDataScraper import Fin10JQKA, FinHKEX, FinAdapter
 from finReportHandler import FinReportHandler
+from credentials import apiUrl, token, receiver_email, sender_email, sender_password
 
 description = """
 NAME
@@ -9,7 +10,7 @@ NAME
 SYNOPSIS:
       python sodium.py help
       python sodium.py [ -S ] [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ] SYMBOL
-      python sodium.py scrape --apiUrl=API_URL --token=TOKEN [ -a | --source=SOURCE ] [ --retryMax=MAX ]
+      python sodium.py scrape [ -a | --source=SOURCE ] [ --retryMax=MAX ]
                               SYMBOL | [ --fromSymbol=SYMBOL ] ALL
 
 OPTIONS:
@@ -33,8 +34,6 @@ PARAMS:
 
                     (Scrape mode)
       --source      Source of data
-      --apiUrl      API url for sending requests
-      --token       Authorization token
       --fromSymbol  Starting symbol
 """
 
@@ -56,8 +55,6 @@ if __name__ == '__main__':
     print(description)
   elif 'scrape' in argv:
     needAdjustments = '-a' in options
-    apiUrl = get_param('apiUrl', options)
-    token = get_param('token', options)
     source = get_param('source', options) if not needAdjustments else None
     retryMax = get_param('retryMax', options)
 
@@ -67,12 +64,6 @@ if __name__ == '__main__':
     if source not in targetSources and not needAdjustments:
       print('WARNING:')
       print('\tSource should be provided, choosing from targetSources({}).'.format(', '.join(targetSources)))
-      exit()
-
-    if apiUrl in [None, ''] or token in [None, '']:
-      print(description, '\n'*2)
-      print('WARNING:')
-      print('\tApiUrl and token should be provided for sending POST requests.', '\n'*2)
       exit()
 
     if len(argv) < 3:

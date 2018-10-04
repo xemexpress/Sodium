@@ -2,9 +2,12 @@ import time
 from random import randint
 from math import floor, log10
 import json
+import smtplib
+from email.mime.text import MIMEText
 import requests
 from bs4 import BeautifulSoup
 from hanziconv import HanziConv
+from credentials import sender_email, sender_password, receiver_email
 
 class BasicTools:
   session = requests.session()
@@ -78,8 +81,6 @@ class FinDataScraper(BasicTools):
   symbols = []
   existedFinancialYears = None
 
-  catched = []
-  
   def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
     print('\n'*20)
 
@@ -114,11 +115,17 @@ class FinDataScraper(BasicTools):
     print("{} can't be found. Please check.".format(symbol))
     exit()
 
-  def report_catched(self):
-    if len(self.catched) != 0:
-      print('\n\nCatched:')
-      for i, symbol in enumerate(self.catched):
-        print('{}. {}'.format(i,symbol))
+  def send_alert(self, symbol):
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls() 
+    s.login(sender_email, sender_password)
+    msg = MIMEText('Symbol: {}\n\n'.format(symbol))
+    msg['Subject'] = 'Equity Search Alert'
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    s.send_message(msg)
+    s.quit()
+    print('Email sent.')
 
   def ensure_company(self, symbol, companyName):
     companyAPIs = {
@@ -320,7 +327,7 @@ class Fin10JQKA(FinDataScraper):
         print('Another unit is found:', unit)
         exit()
     else:
-      self.report('Equity records retrieved is not as expected. Catched. Now getting into another set of data...')
+      self.report('Equity records retrieved is not as expected. Now getting into another set of data...')
       site = '{}/{}{}/holder.html'.format(self.site, self.region, symbol[1:])
 
       for i in range(self.retryMax):
@@ -355,8 +362,37 @@ class Fin10JQKA(FinDataScraper):
           print('Another unit is found:', unit)
           exit()
       else:
-        self.catched.append(symbol)
-        print('holder_change_record is not found as expected. Catched. Going next...')
+        holder_main_record = bs.find('div', { 'id': 'main' })
+        if holder_main_record is not None:
+          table = holder_main_record.select('.bd.pt5')[0]
+          dates = []              # [yyyymmdd]
+          equities = []           # [equity]
+
+          for date in table.select('p'):
+            dates.append(date.get_text().strip().replace('-',''))
+
+          for equity in table.select('.m_table.m_hl'):
+            unit_target = equity.select('thead th')[2].get_text()
+            unit = unit_target[unit_target.find('(')+1 : unit_target.find(')')]
+
+            if unit == '万股':
+              first_main_record = equity.select('tbody tr')[0]
+              items = first_main_record.find_all('td')
+
+              part = float(items[1].get_text()) * 10000
+              percentage = float(items[2].get_text()) / 100
+
+              if percentage != 0.0:
+                shares = int(round_sigfigs(part/percentage, 4))
+                equities.append(shares)
+            else:
+              print('Another unit is found:', unit)
+              exit()
+
+          for i, date in enumerate(dates):
+            self.equityRecords.append((date, equities[i]))
+        else:
+          send_alert(symbol)
 
   def sort_financials(self):
     # Get Periods Ready
@@ -534,7 +570,6 @@ class Fin10JQKA(FinDataScraper):
         self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
         self.announce('Skip', skip=3)
     print('Processing Completed.')
-    self.report_catched()
 
 class FinHKEX(FinDataScraper):
   site = 'http://www.hkexnews.hk/sdw/search/searchsdw_c.aspx'

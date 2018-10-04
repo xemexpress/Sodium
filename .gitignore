@@ -61,3 +61,5 @@ target/
 downloaded
 
 test\.py
+
+credentials\.py
