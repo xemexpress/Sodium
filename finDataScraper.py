@@ -328,24 +328,30 @@ class Fin10JQKA(FinDataScraper):
       bs = BeautifulSoup(response.content, 'lxml')
 
       holder_change_record = bs.find('table', { 'class': 'mt15 m_table m_hl'})
-      unit_target = holder_change_record.select('thead th')[3].get_text()
-      unit = unit_target[unit_target.find('(')+1 : unit_target.find(')')]
+      unit_target = holder_change_record.select('thead th')
 
-      if unit == '万股':
-        changes = holder_change_record.select('tbody tr')
-        prev_date = ''
-        for change in changes:
-          date = change.find('th').get_text().replace('-','')
-          items = change.find_all('td')
+      if unit_target is not None:
+        unit_target = unit_target[3].get_text()
+        unit = unit_target[unit_target.find('(')+1 : unit_target.find(')')]
 
-          part = float(items[2].get_text()) * 10000
-          percentage = float(items[3].get_text()) / 100
-          equity = int(self.round_sigfigs(part/percentage, 3))
-          if date != prev_date:
-            self.equityRecords.append((date, equity))
-            prev_date = date
+        if unit == '万股':
+          changes = holder_change_record.select('tbody tr')
+          prev_date = ''
+          for change in changes:
+            date = change.find('th').get_text().replace('-','')
+            items = change.find_all('td')
+
+            part = float(items[2].get_text()) * 10000
+            percentage = float(items[3].get_text()) / 100
+            equity = int(self.round_sigfigs(part/percentage, 3))
+            if date != prev_date:
+              self.equityRecords.append((date, equity))
+              prev_date = date
+        else:
+          print('Another unit is found:', unit)
+          exit()
       else:
-        print('Another unit is found:', unit)
+        print('Another situation happened.')
         exit()
 
   def sort_financials(self):
