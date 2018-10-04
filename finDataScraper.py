@@ -222,6 +222,8 @@ class Fin10JQKA(FinDataScraper):
   financials = []
   year_sigs = []
 
+  catched = []
+
   def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
@@ -281,29 +283,63 @@ class Fin10JQKA(FinDataScraper):
     self.report('Equity records retrieved. Now getting into the data...')
     bs = BeautifulSoup(response.content, 'lxml')
 
-    unit = bs.find('p', { 'class': 'p5_0 tr' }).get_text()[-3:]
-    print('Equity unit:', unit)
+    unit = bs.find('p', { 'class': 'p5_0 tr' })
+    if unit is not None:
+      unit = unit.get_text()[-3:]
+      print('Equity unit:', unit)
+      if unit == '百万股':
+        target = bs.find('div', { 'id': 'change' })
+        table = target.find('table', { 'class': 'm_table m_hl' })
 
-    if unit == '百万股':
-      target = bs.find('div', { 'id': 'change' })
-      table = target.find('table', { 'class': 'm_table m_hl' })
-
-      changes = table.find_all('tr')
-      for change in changes:
-        items = change.find_all('td')
-        date = None
-        equity = 1
-        for i, item in enumerate(items):
-          if i == 1:
-            equity = int(float(item.get_text().strip())*1000000)
-          elif i == 3:
-            date = item.get_text().strip().replace('-', '')
-        if date is not None:
-          self.equityRecords.append((date, equity))
-
+        changes = table.find_all('tr')
+        for change in changes:
+          items = change.find_all('td')
+          date = None
+          equity = 1
+          for i, item in enumerate(items):
+            if i == 1:
+              equity = int(float(item.get_text().strip())*1000000)
+            elif i == 3:
+              date = item.get_text().strip().replace('-', '')
+          if date is not None:
+            self.equityRecords.append((date, equity))
+      else:
+        print('Another unit is found:', unit)
+        exit()
     else:
-      print('Another unit is found:', unit)
-      exit()
+      self.catched.append(symbol)
+      self.report('Equity records retrieved is not as expected. Catched. Now getting into another set of data...')
+      site = 'http://{}/{}{}/holder.html'.format(self.site, self.region, symbol[1:])
+
+      for i in range(self.retryMax):
+        try:
+          response = self.session.get(site, headers=headers)
+          break
+        except:
+          self.announce('Retrying again', wait=(i*10+randint(0,4)))
+          pass
+      bs = BeautifulSoup(response.content, 'lxml')
+
+      holder_change_record = bs.find('table', { 'class': 'mt15 m_table m_hl'})
+      unit_target = holder_change_record.select('thead th')[3].get_text()
+      unit = unit_target[unit_target.find('(')+1 : unit_target.find(')')]
+
+      if unit == '万股':
+        changes = holder_change_record.select('tbody tr')
+        prev_date = ''
+        for change in changes:
+          date = change.find('th').get_text().replace('-','')
+          items = change.find_all('td')
+
+          part = float(items[2].get_text()) * 10000
+          percentage = float(items[3].get_text()) / 100
+          equity = int(round_sigfigs(part/percentage, 3))
+          if date != prev_date:
+            self.equityRecords.append((date, equity))
+            prev_date = date
+      else:
+        print('Another unit is found:', unit)
+        exit()
 
   def sort_financials(self):
     # Get Periods Ready
@@ -481,6 +517,10 @@ class Fin10JQKA(FinDataScraper):
         self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
         self.announce('Skip', skip=3)
     print('Processing Completed.')
+    if len(self.catched) != 0:
+      print('\nCatched:')
+      for i, symbol in enumerate(self.catched):
+        print('{}. {}'.format(i,symbol))
 
 class FinHKEX(FinDataScraper):
   site = 'http://www.hkexnews.hk/sdw/search/searchsdw_c.aspx'
