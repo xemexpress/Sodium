@@ -346,10 +346,11 @@ class Fin10JQKA(FinDataScraper):
 
             part = float(items[2].get_text()) * 10000
             percentage = float(items[3].get_text()) / 100
-            equity = int(self.round_sigfigs(part/percentage, 3))
-            if date != prev_date:
-              self.equityRecords.append((date, equity))
-              prev_date = date
+            if percentage != 0.0:
+              equity = int(self.round_sigfigs(part/percentage, 4))
+              if date != prev_date:
+                self.equityRecords.append((date, equity))
+                prev_date = date
         else:
           print('Another unit is found:', unit)
           exit()
