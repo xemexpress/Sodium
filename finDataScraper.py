@@ -78,6 +78,8 @@ class FinDataScraper(BasicTools):
   symbols = []
   existedFinancialYears = None
 
+  catched = []
+  
   def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
     print('\n'*20)
 
@@ -111,6 +113,12 @@ class FinDataScraper(BasicTools):
 
     print("{} can't be found. Please check.".format(symbol))
     exit()
+
+  def report_catched(self):
+    if len(self.catched) != 0:
+      print('\n\nCatched:')
+      for i, symbol in enumerate(self.catched):
+        print('{}. {}'.format(i,symbol))
 
   def ensure_company(self, symbol, companyName):
     companyAPIs = {
@@ -229,8 +237,6 @@ class Fin10JQKA(FinDataScraper):
   financials = []
   year_sigs = []
 
-  catched = []
-
   def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
     super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
     self.report('Task:\n\tTarget {} from {} for resonance, position and cashFlow.'.format(symbol, self.site))
@@ -314,7 +320,6 @@ class Fin10JQKA(FinDataScraper):
         print('Another unit is found:', unit)
         exit()
     else:
-      self.catched.append(symbol)
       self.report('Equity records retrieved is not as expected. Catched. Now getting into another set of data...')
       site = '{}/{}{}/holder.html'.format(self.site, self.region, symbol[1:])
 
@@ -349,8 +354,8 @@ class Fin10JQKA(FinDataScraper):
           print('Another unit is found:', unit)
           exit()
       else:
-        print('holder_change_record is not found as expected. Please go check.')
-        exit()
+        self.catched.append(symbol)
+        print('holder_change_record is not found as expected. Catched. Going next...')
 
   def sort_financials(self):
     # Get Periods Ready
@@ -528,10 +533,7 @@ class Fin10JQKA(FinDataScraper):
         self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
         self.announce('Skip', skip=3)
     print('Processing Completed.')
-    if len(self.catched) != 0:
-      print('\nCatched:')
-      for i, symbol in enumerate(self.catched):
-        print('{}. {}'.format(i,symbol))
+    self.report_catched()
 
 class FinHKEX(FinDataScraper):
   site = 'http://www.hkexnews.hk/sdw/search/searchsdw_c.aspx'
