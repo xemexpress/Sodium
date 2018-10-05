@@ -383,7 +383,7 @@ class Fin10JQKA(FinDataScraper):
               percentage = float(items[2].get_text()) / 100
 
               if percentage != 0.0:
-                shares = int(round_sigfigs(part/percentage, 4))
+                shares = int(self.round_sigfigs(part/percentage, 4))
                 equities.append(shares)
             else:
               print('Another unit is found:', unit)
