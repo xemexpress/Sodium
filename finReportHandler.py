@@ -53,7 +53,14 @@ class FinReportHandler:
             }
 
             session = requests.session()
-            response = session.get('http://www.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', headers=headers)
+            for j in range(retryMax):
+                try:
+                    response = session.get('http://www.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', headers=headers)
+                    break
+                except:
+                    self.announce('Retrying again', wait=(4+randint(0,4)))
+                    pass
+
             bs = BeautifulSoup(response.content, 'lxml')
 
             date = bs.find('input', { 'name': 'ctl00$txt_today' }).get('value')
