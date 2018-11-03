@@ -53,12 +53,12 @@ class BasicTools:
       print('Error: {}'.format(json_string))
       return { 'state': False, 'data': json_string }
     
-  def retrieve_all_symbols(self):           # Format: [symbol, companyName]
+  def retrieve_all_symbols(self, retryMax):           # Format: [symbol, companyName]
     self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
 
     site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
 
-    for i in range(self.retryMax):
+    for i in range(retryMax):
       try:
         response = self.session.get(site, headers=self.browserHeaders)
         break
@@ -99,7 +99,7 @@ class FinDataScraper(BasicTools):
     if symbol == 'ALL':
       self.announce("REMINDING: You're conducting a COMPLETE financial data search", wait=7, skip=7)
     
-    self.symbols = self.retrieve_all_symbols()
+    self.symbols = self.retrieve_all_symbols(retryMax)
     if symbol == 'ALL':
       if fromSymbol is None:
         return
@@ -134,7 +134,7 @@ class FinDataScraper(BasicTools):
     s.quit()
     print('Email sent.')
 
-  def ensure_company(self, symbol, companyName):
+  def ensure_company(self, region, symbol, companyName):
     companyAPIs = {
       'get': '/companies/{}'.format(symbol.lstrip('0')),
       'post': '/companies'
@@ -153,7 +153,7 @@ class FinDataScraper(BasicTools):
     if not self.log(response)['state']:
       self.announce('Creating company {} {}...'.format(companyName, symbol), wait=3)
       
-      site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(self.region, symbol[-4:])
+      site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(region, symbol[-4:])
 
       for i in range(self.retryMax):
         try:
@@ -278,25 +278,28 @@ class Fin10JQKA(FinDataScraper):
     bs = BeautifulSoup(response.content, 'lxml')
 
     unit = bs.find('p', { 'class': 'p5_0 tr' })
-    if unit is not None:
+    if unit is not None and bs.find('div', { 'id': 'change' }) is not None:
       unit = unit.get_text()[-3:]
       print('Equity unit:', unit)
       if unit == '百万股':
         target = bs.find('div', { 'id': 'change' })
-        table = target.find('table', { 'class': 'm_table m_hl' })
+        if target is not None:
+          table = target.find('table', { 'class': 'm_table m_hl' })
 
-        changes = table.find_all('tr')
-        for change in changes:
-          items = change.find_all('td')
-          date = None
-          equity = 1
-          for i, item in enumerate(items):
-            if i == 1:
-              equity = int(float(item.get_text().strip())*1000000)
-            elif i == 3:
-              date = item.get_text().strip().replace('-', '')
-          if date is not None:
-            self.equityRecords.append((date, equity))
+          changes = table.find_all('tr')
+          for change in changes:
+            items = change.find_all('td')
+            date = None
+            equity = 1
+            for i, item in enumerate(items):
+              if i == 1:
+                equity = int(float(item.get_text().strip())*1000000)
+              elif i == 3:
+                date = item.get_text().strip().replace('-', '')
+            if date is not None:
+              self.equityRecords.append((date, equity))
+        else:
+          self.send_alert('Equity Search Alert', symbol)
       else:
         print('Another unit is found:', unit)
         exit()
@@ -503,7 +506,7 @@ class Fin10JQKA(FinDataScraper):
       self.announce('{}: Getting resonance, position, cashFlow statements'.format(companyName), wait=(7+randint(0,4)))
       if self.get_all_statements(symbol, retryMax=self.retryMax):
         # Ensure the company has been created.
-        self.ensure_company(symbol, companyName)
+        self.ensure_company(self.region, symbol, companyName)
 
         # Get equity records
         self.get_equity_records(symbol, retryMax=self.retryMax)
