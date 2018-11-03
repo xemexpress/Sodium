@@ -77,7 +77,7 @@ class BasicTools:
 
         result = bs.select("[class^=TableContentStyle]")
         
-        if given is 'all':
+        if given == 'all':
             result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], result))
         else:
             symbol = self.stock_code(given)
