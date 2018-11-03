@@ -51,7 +51,7 @@ class BasicTools:
             print('PDF {} retrieved.'.format(pdf.get_text()))
     
     def set_directory(self, downloadDirectory, fileName, companyName, symbol):
-        path = '{}/{}/reports/{}'.format(downloadDirectory, '{}{}'.format(companyName, symbol), fileName)
+        path = '{}/{}/reports/{}'.format(downloadDirectory, '{}{}'.format(symbol, companyName), fileName)
         directory = os.path.dirname(path)
         
         if not os.path.exists(directory):
@@ -97,7 +97,7 @@ class FinReportHandler(BasicTools):
         self.downloadDirectory = downloadDirectory
         self.retryMax = retryMax
         self.symbols = self.retrieve_all_symbols(symbol, retryMax)
-        self.report('Start crawling')
+        self.report('Start crawling...')
         
     def get(self, companyName, symbol): # This sets self.pdfs
         self.pdfs = []
@@ -176,7 +176,7 @@ class FinReportHandler(BasicTools):
             nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
         print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), companyName, symbol))
         
-        prev = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol)))
+        prev = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
         for i, pdf in enumerate(self.pdfs):
             fileName = pdf[0]
             source = pdf[1]
@@ -194,7 +194,7 @@ class FinReportHandler(BasicTools):
                         pass
             self.log_downloads(len(self.pdfs), i+1, existed)
 
-        self.pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol)))
+        self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
         self.pdfs.sort(key=lambda x: x[-12:])
         
     def extract_tables(self, companyName, symbol, onlyFirstThree, wanted='表', unwanted='附註'):
@@ -240,7 +240,7 @@ class FinReportHandler(BasicTools):
                     writer.addBookmark(title[0], printingPage, parent)
                 printingPage += 1
         
-        with open('{}/{}/{} {} Tables.pdf'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol), companyName, 'Consolidated' if onlyFirstThree else ''), 'wb') as tar:
+        with open('{}/{}/{} {} Tables.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName, 'Consolidated' if onlyFirstThree else ''), 'wb') as tar:
             writer.write(tar)
             self.announce('Tables merged successfully.', skip=7)
 
@@ -282,7 +282,7 @@ class FinReportHandler(BasicTools):
                     isFirstPage = False
                 printingPage += 1
 
-        with open('{}/{}/{} Notes.pdf'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol), companyName), 'wb') as tar:
+        with open('{}/{}/{} Notes.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName), 'wb') as tar:
             writer.write(tar)
             self.announce('Notes merged successfully.', skip=7)
 
@@ -295,12 +295,12 @@ class FinReportHandler(BasicTools):
                 print('{} merged.'.format(fileName))
 
             print('Start writing...')
-            with open('{}/{}/{}.pdf'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol), companyName), 'wb') as tar:
+            with open('{}/{}/{}.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName), 'wb') as tar:
                 merger.write(tar)
                 self.announce('Merged successfully.', skip=7)
 
     def clean_up(self, companyName, symbol):
-        rmtree('{}/{}/reports'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol)))
+        rmtree('{}/{}/reports'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
         print('Cleaned up.')
 
     def process(self, consolidatedTables, tables, notes, mergeFiles, cleanUp):
