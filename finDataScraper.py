@@ -12,6 +12,20 @@ from credentials import sender_email, sender_password, receiver_email
 class BasicTools:
   session = requests.session()
 
+  browserHeaders = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
+  }
+
+  def dbHeaders(self, token):
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Token {}'.format(token)
+    }
+
   def announce(self, message, wait=0, skip=0):
     print(message, end=' (waiting for {} seconds)'.format(wait) if wait is not 0 else '')
     while wait > 0:
@@ -42,18 +56,11 @@ class BasicTools:
   def retrieve_all_symbols(self):           # Format: [symbol, companyName]
     self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
 
-    site = 'http://www.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
-    headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
-    }
+    site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get(site, headers=headers)
+        response = self.session.get(site, headers=self.browserHeaders)
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -134,14 +141,10 @@ class FinDataScraper(BasicTools):
     }
 
     site = '{}{}'.format(self.apiUrl, companyAPIs['get'])
-    headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Token {}'.format(self.token)
-    }
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get(site, headers=headers)
+        response = self.session.get(site, headers=self.dbHeaders(self.token))
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -151,17 +154,10 @@ class FinDataScraper(BasicTools):
       self.announce('Creating company {} {}...'.format(companyName, symbol), wait=3)
       
       site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(self.region, symbol[-4:])
-      headers = {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept-Encoding': 'gzip, deflate',
-          'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
-      }
 
       for i in range(self.retryMax):
         try:
-          response = self.session.get(site, headers=headers)
+          response = self.session.get(site, headers=self.browserHeaders)
           break
         except:
           self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -184,14 +180,10 @@ class FinDataScraper(BasicTools):
       json_company = json.dumps(data)
       
       site = '{}{}'.format(self.apiUrl, companyAPIs['post'])
-      headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Token {}'.format(self.token)
-      }
 
       for i in range(self.retryMax):
         try:
-          response = self.session.post(site, headers=headers, data=json_company)
+          response = self.session.post(site, headers=self.dbHeaders(self.token), data=json_company)
           break
         except:
           self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -202,14 +194,10 @@ class FinDataScraper(BasicTools):
 
   def check_existed_financial_years(self, symbol):
     site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol))
-    headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Token {}'.format(self.token)
-    }
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get(site, headers=headers)
+        response = self.session.get(site, headers=self.dbHeaders(self.token))
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -250,17 +238,10 @@ class Fin10JQKA(FinDataScraper):
 
   def get_all_statements(self, symbol, retryMax):
     site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol[1:])
-    headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
-    }
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get(site, headers=headers)
+        response = self.session.get(site, headers=self.browserHeaders)
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -284,17 +265,10 @@ class Fin10JQKA(FinDataScraper):
     self.equityRecords = []
 
     site = '{}/{}{}/equity.html'.format(self.site, self.region, symbol[1:])
-    headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
-    }
 
     for i in range(self.retryMax):
       try:
-        response = self.session.get(site, headers=headers)
+        response = self.session.get(site, headers=self.browserHeaders)
         break
       except:
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -332,7 +306,7 @@ class Fin10JQKA(FinDataScraper):
 
       for i in range(self.retryMax):
         try:
-          response = self.session.get(site, headers=headers)
+          response = self.session.get(site, headers=self.browserHeaders)
           break
         except:
           self.announce('Retrying again', wait=(i*10+randint(0,4)))
@@ -524,11 +498,6 @@ class Fin10JQKA(FinDataScraper):
 
   def process(self):
     self.announce('Start scraping resonance, position and cashFlow!', skip=7)
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Token {}'.format(self.token)
-    }
 
     for symbol, companyName in self.symbols:
       self.announce('{}: Getting resonance, position, cashFlow statements'.format(companyName), wait=(7+randint(0,4)))
@@ -559,217 +528,13 @@ class Fin10JQKA(FinDataScraper):
           self.report('{}: {} financial {}'.format(companyName, 'Updating' if existed else 'Posting', financial['year']))
           for i in range(self.retryMax):
             try:
-              response = self.session.put(site, headers=headers, data=json_string) if existed else self.session.post(site, headers=headers, data=json_string)
+              response = self.session.put(site, headers=self.dbHeaders(self.token), data=json_string) if existed else self.session.post(site, headers=self.dbHeaders(self.token), data=json_string)
               break
             except:
               self.announce('Retrying again', wait=(i*10+randint(0,4)))
               pass
           self.log(response)
         self.announce('Uploads for {} completed.'.format(companyName), skip=3)
-      else:
-        self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
-        self.announce('Skip', skip=3)
-    print('Processing Completed.')
-
-class FinHKEX(FinDataScraper):
-  site = 'http://www.hkexnews.hk/sdw/search/searchsdw_c.aspx'
-  
-  sharesOutstanding = 1
-  
-  def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
-    super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
-    self.report('Task:\n\tTarget {} from {} for sharesOutstanding.'.format(symbol, self.site))
-
-  def process(self):
-    def get_sharesOutstanding(symbol):
-      headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
-      }
-      
-      # Retrieve necessary form data
-      for i in range(self.retryMax):
-        try:
-          response = self.session.get(self.site, headers=headers)
-          break
-        except:
-          self.announce('Retrying again', wait=(i*10+randint(0,4)))
-          pass
-
-      bs = BeautifulSoup(response.content, 'lxml')
-
-      form_data = {
-        '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
-        '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
-        '__EVENTVALIDATION': bs.find('input', { 'name': '__EVENTVALIDATION' }).get('value'),
-        'today': bs.find('input', { 'name': 'today' }).get('value'),
-        'ddlShareholdingDay': bs.find('select', { 'name': 'ddlShareholdingDay' }).find('option', { 'selected': 'selected' }).get('value'),
-        'ddlShareholdingMonth': bs.find('select', { 'name': 'ddlShareholdingMonth' }).find('option', { 'selected': 'selected' }).get('value'),
-        'ddlShareholdingYear': bs.find('select', { 'name': 'ddlShareholdingYear' }).find('option', { 'selected': 'selected' }).get('value'),
-        'txtStockCode': symbol,
-        'btnSearch.x': 31,
-        'btnSearch.y': 7
-      }
-
-      for i in range(self.retryMax):
-        try:
-          response = self.session.post(self.site, data=form_data, headers=headers)
-          break
-        except:
-          self.announce('Retrying again', wait=(i*10+randint(0,4)))
-          pass
-
-      self.report('Outstanding shares retrieved.')
-      bs = BeautifulSoup(response.content, 'lxml')
-      target = bs.find('div', { 'id': 'pnlResultSummary' })
-      if target:
-        target = target.find_all('tr')[-1].find('span')
-        self.sharesOutstanding = int(target.get_text().lstrip().replace(',', ''))
-        return True
-      else:
-        return False
-      
-    self.announce('Start scraping sharesOutstanding!', skip=7)
-
-    headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Token {}'.format(self.token)
-    }
-
-    for symbol, companyName in self.symbols:
-      self.check_existed_financial_years(symbol)
-
-      if len(self.existedFinancialYears) > 0:
-        self.announce('\n\n{} {}: Getting sharesOutstanding'.format(companyName, symbol), wait=(4+randint(0,4)))
-        if get_sharesOutstanding(symbol):
-          data = { 'financial': { 'sharesOutstanding': self.sharesOutstanding } }
-          json_string = json.dumps(data)
-
-          self.report('Updating sharesOutstanding ({}) at {}'.format(self.sharesOutstanding, self.existedFinancialYears[-1]))
-          for i in range(self.retryMax):
-            try:
-              response = self.session.put('{}{}'.format(self.apiUrl, self.financialAPI(symbol, self.existedFinancialYears[-1])), headers=headers, data=json_string)
-              break
-            except:
-              self.announce('Retrying again', wait=(i*10+randint(0,4)))
-              pass
-          self.log(response)
-        else:
-          print('Failed to get the latest sharesOutstanding of {} {}. Skip.'.format(companyName, symbol))
-      else:
-        print('Basic informations about {} {} do not exist. Skip.'.format(companyName, symbol))
-    print('Processing Completed.')
-
-class FinAdapter(FinDataScraper):
-  site = 'http://basic.10jqka.com.cn'
-  region = 'HK'
-
-  cashFlow = None
-  financials = []
-  year_sigs = []
-
-  def __init__(self, apiUrl, token, retryMax, symbol, fromSymbol=None):
-    super().__init__(apiUrl, token, retryMax, symbol, fromSymbol)
-    self.report('Task:\n\tTarget {} from {} for cashFlow.'.format(symbol, self.site))
-
-  def get_all_statements(self, symbol, retryMax):
-    site = '{}/{}{}/finance.html'.format(self.site, self.region, symbol[1:])
-    headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
-    }
-
-    for i in range(self.retryMax):
-      try:
-        response = self.session.get(site, headers=headers)
-        break
-      except:
-        self.announce('Retrying again', wait=(i*10+randint(0,4)))
-        pass
-
-    self.report('Online source retrieved. Now getting into the data...')
-    bs = BeautifulSoup(response.content, 'lxml')
-    if bs.find(id='cash'):
-      self.cashFlow = json.loads(bs.find(id='cash').get_text())
-      self.report('現金流量表 retrieved.')
-      return True
-    else:
-      return None
-
-  def sort_financials(self):
-    # Get Periods Ready
-    self.report('Retrieving periods...')
-    report_periods = self.cashFlow['report'][0]
-    year_periods = self.cashFlow['year'][0]
-
-    # Get Statements Clear
-    self.report('Processing...')
-    # Processing 現金流量表
-    self.cashFlow['title'] = self.cashFlow['title'][1:]
-    self.cashFlow['report'] = self.cashFlow['report'][1:]
-    self.cashFlow['year'] = self.cashFlow['year'][1:]
-
-    # Reset financials and year signatures
-    self.financials = []
-    if year_periods is not None:
-      self.year_sigs = [(self.cashFlow['year'][1][i], self.cashFlow['year'][2][i]) for i, year_period in enumerate(year_periods)]
-
-    # Create financial dictionaries one by one
-    for i, period in enumerate(report_periods):
-      financial = {
-        'year': period.replace('-', '')
-      }
-      # Sort Cash Flow
-      for j, item in enumerate(self.cashFlow['title']):
-        if j == 1 and len(self.year_sigs) != 0 and len([(first, second) for first, second in self.year_sigs if first == self.cashFlow['report'][1][i] and second == self.cashFlow['report'][2][i]]) == 1:
-          financial['year'] += 'Y'
-
-      self.report('Data of {} loaded.'.format(financial['year']))
-      self.financials.append(financial)
-
-  def process(self):
-    self.announce('Start scraping cashFlow for updating year!', skip=7)
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Token {}'.format(self.token)
-    }
-
-    for symbol, companyName in self.symbols:
-      self.announce('{}: Getting cashFlow statement'.format(companyName), wait=(7+randint(0,4)))
-      if self.get_all_statements(symbol, retryMax=self.retryMax):
-        # Ensure the company has been created.
-        self.ensure_company(symbol, companyName)
-
-        # Sort self.cashFlow into self.financials
-        self.sort_financials()
-
-        self.check_existed_financial_years(symbol)
-        
-        # Upload self.financials   
-        for financial in self.financials:
-          data = { 'financial': financial }
-          json_string = json.dumps(data)
-
-          # Check if the financial of the year already exists
-          site = '{}{}'.format(self.apiUrl, self.financialAPI(symbol, financial['year'][:8]))
-          
-          self.report('{}: {} financial {} to {}'.format(companyName, 'Updating', financial['year'][:8], financial['year']))
-          for i in range(self.retryMax):
-            try:
-              response = self.session.put(site, headers=headers, data=json_string)
-              break
-            except:
-              self.announce('Retrying again', wait=(i*10+randint(0,4)))
-              pass
-          self.log(response)
-        self.announce('Uploads for {} {} completed.'.format(companyName, symbol), skip=3)
       else:
         self.report('Company {}{} is not listed at {}'.format(self.region, symbol, self.site))
         self.announce('Skip', skip=3)

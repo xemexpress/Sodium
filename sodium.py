@@ -1,6 +1,6 @@
 from sys import argv
-from finDataScraper import Fin10JQKA, FinHKEX, FinAdapter
-from finReportHandler import FinReportHandler
+from finDataScraper import Fin10JQKA
+from finReportScraper import FinReportHandler
 from credentials import apiUrl, token, receiver_email, sender_email, sender_password
 
 description = """
@@ -15,7 +15,6 @@ SYNOPSIS:
 
 OPTIONS:
                     (Download mode)
-      -S            Skip download process, usually because files have been downloaded.
       -t            Extract pages containing table(s) and merge for data analysis.
       -T            Provide a consolidated version of -t
       -n            Extract notes.
@@ -87,8 +86,8 @@ if __name__ == '__main__':
     scraper.process()
   else:
     symbol = argv[1]
-    skipDownload = '-S' in options
-    needTables = '-t' in options or '-T' in options
+    needConsolidatedTables = '-T' in options
+    needTables = '-t' in options
     needNotes = '-n' in options
     needMergeFiles = '-m' in options
     needCleanUp = '-C' in options
@@ -98,20 +97,7 @@ if __name__ == '__main__':
     downloadDirectory = downloadDirectory if downloadDirectory not in [None, ''] else default['downloadDirectory']
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
-    handler = FinReportHandler(downloadDirectory)
-    handler.get(symbol, skipDownload, retryMax)
-
-    if needTables:
-      consolidated = '-T' in options
-      handler.extract_tables(wanted='表', unwanted='附註', onlyFirstThree=consolidated)
-
-    if needNotes:
-      handler.extract_notes(wanted='附註')
-
-    if needMergeFiles:
-      handler.merge_files()
-
-    if needCleanUp:
-      handler.clean_up()
+    handler = FinReportHandler(downloadDirectory, retryMax, symbol)
+    handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, notes=needNotes, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
 
     print('Exit')
