@@ -197,7 +197,7 @@ class FinReportHandler(BasicTools):
         self.pdfs = glob('{}/{}/*.pdf'.format(self.downloadDirectory, '{}{}'.format(companyName, symbol)))
         self.pdfs.sort(key=lambda x: x[-12:])
         
-    def extract_tables(self, companyName, onlyFirstThree, wanted='表', unwanted='附註'):
+    def extract_tables(self, companyName, symbol, onlyFirstThree, wanted='表', unwanted='附註'):
         def head_and_tail(reader, destinations, wantedWord=wanted, unwantedWord=unwanted, requireConsolidated=onlyFirstThree):
             # Destination's format: [(title, pageNum)]
             lastMark = None
@@ -244,7 +244,7 @@ class FinReportHandler(BasicTools):
             writer.write(tar)
             self.announce('Tables merged successfully.', skip=7)
 
-    def extract_notes(self, companyName, wanted='附註'):
+    def extract_notes(self, companyName, symbol, wanted='附註'):
         def head_and_tail(reader, wanted=wanted):
             first = None
             end = None
@@ -286,7 +286,7 @@ class FinReportHandler(BasicTools):
             writer.write(tar)
             self.announce('Notes merged successfully.', skip=7)
 
-    def merge_whole(self, companyName):
+    def merge_whole(self, companyName, symbol):
             print('Start merging files...')
             merger = PdfFileMerger()
             for pdf in self.pdfs:
@@ -309,10 +309,10 @@ class FinReportHandler(BasicTools):
             self.get(company, symbol)
 
             if mergeFiles:
-                self.merge_whole(company)
+                self.merge_whole(company, symbol)
             if consolidatedTables or tables:
-                self.extract_tables(company, onlyFirstThree=consolidatedTables)
+                self.extract_tables(company, symbol, onlyFirstThree=consolidatedTables)
             if notes:
-                self.extract_notes(company)
+                self.extract_notes(company, symbol)
             if cleanUp:
                 self.clean_up(company, symbol)
