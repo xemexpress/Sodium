@@ -38,17 +38,18 @@ class BasicTools:
             print('{}. Got {} left.'.format('Downloaded' if not existed else 'Detected', total - acquired))
 
     def stock_code(self, symbol):         # return a 5-letter-long symbol
-        symbol = symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
-        print('Handling the company({})...'.format(symbol))
-        return symbol
+        return symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
 
-    def append_urls(self, bs, pdfs):                          # Format: [(fileName, source)]
+    def append_urls(self, bs, pdfs, unwantedWord='多檔案'):                          # Format: [(fileName, source)]
         for pdf in bs.find_all('a', { 'class': 'news' }):
             # Format: name + publicationDate(for sake of sorting)
-            fileName = '{} {}.pdf'.format(pdf.get_text().replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
-            source = 'http://www3.hkexnews.hk' + pdf.get('href')
-            pdfs.append([fileName, source])
-            print('PDF {} retrieved.'.format(pdf.get_text()))
+            if unwantedWord not in pdf.next_sibling.next_sibling.string and unwantedWord not in pdf.get_text():
+                fileName = '{} {}.pdf'.format(pdf.get_text().replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
+                source = 'http://www3.hkexnews.hk' + pdf.get('href')
+                pdfs.append([fileName, source])
+                print('PDF {} retrieved.'.format(pdf.get_text()))
+            else:
+                print('PDF {} with {} skipped.'.format(pdf.get_text(), pdf.next_sibling.next_sibling.string))
     
     def set_directory(self, downloadDirectory, fileName, companyName, symbol):
         path = '{}/{}/reports/{}'.format(downloadDirectory, '{}{}'.format(symbol, companyName), fileName)
@@ -58,12 +59,12 @@ class BasicTools:
             os.makedirs(directory)
         return path
 
-    def retrieve_all_symbols(self, given, retryMax):              # Format: [(symbol, companyName)]
+    def retrieve_all_symbols(self, symbol, retryMax):              # Format: [(symbol, companyName)]
         self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
 
         site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
 
-        for i in range(self.retryMax):
+        for i in range(retryMax):
             try:
                 response = self.session.get(site, headers=self.headers)
                 break
@@ -77,14 +78,18 @@ class BasicTools:
 
         result = bs.select("[class^=TableContentStyle]")
         
-        if given == 'all':
+        if symbol == 'ALL':
             result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], result))
         else:
-            symbol = self.stock_code(given)
+            symbol = self.stock_code(symbol)
             result = list(filter(lambda x: x.contents[0].get_text() == symbol, result))
         result = list(map(lambda x: [x.contents[0].get_text(), x.contents[1].get_text()], result))
+        
+        if len(result) == 0:
+            print("{} can't be found. Please check.".format(symbol))
+            exit()
+        
         self.announce('Data are already formatted in form of [symbol, companyName]', skip=7)
-
         return result
 
 class FinReportHandler(BasicTools):
@@ -93,11 +98,38 @@ class FinReportHandler(BasicTools):
     symbols = []                # [(symbol, companyName)]
     pdfs = []                   # [(fileName, source)]
 
-    def __init__(self, downloadDirectory, retryMax, symbol):
+    def __init__(self, downloadDirectory, retryMax, symbol, fromSymbol=None):
+        print('\n'*20)
+
         self.downloadDirectory = downloadDirectory
         self.retryMax = retryMax
+
+        # Set symbols
+        if symbol == 'ALL':
+            self.announce("REMINDING: You're conducting a COMPLETE financial reports search", wait=7, skip=7)
+        
         self.symbols = self.retrieve_all_symbols(symbol, retryMax)
-        self.report('Start crawling...')
+        if symbol == 'ALL':
+            if fromSymbol is None:
+                return
+            else:
+                fromSymbol = self.stock_code(fromSymbol)
+                for i, unit in enumerate(self.symbols):
+                    if unit[0] == fromSymbol:
+                        self.symbols = self.symbols[i:]
+                        print('Starting from {} {}...'.format(unit[1], unit[0]))
+                        return
+                symbol = fromSymbol
+        else:
+            symbol = self.stock_code(symbol)
+            for i, unit in enumerate(self.symbols):
+                if unit[0] == symbol:
+                    self.symbols = self.symbols[i:i+1]
+                    print('Working on {} {}...'.format(unit[1], unit[0]))
+                    return
+
+        print("{} can't be found. Please check.".format(symbol))
+        exit()
         
     def get(self, companyName, symbol): # This sets self.pdfs
         self.pdfs = []

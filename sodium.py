@@ -9,8 +9,9 @@ NAME
 
 SYNOPSIS:
       python sodium.py help
-      python sodium.py [ -S ] [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ] SYMBOL
-      python sodium.py scrape [ -a | --source=SOURCE ] [ --retryMax=MAX ]
+      python sodium.py [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ]
+                              SYMBOL | [ --fromSymbol=SYMBOL ] ALL
+      python sodium.py scrape [ --retryMax=MAX ]
                               SYMBOL | [ --fromSymbol=SYMBOL ] ALL
 
 OPTIONS:
@@ -27,13 +28,10 @@ OPTIONS:
 PARAMS:
                     (Common)
       --retryMax    Number of retries made when failed to download the pdf from HKEX. Default: 3
+      --fromSymbol  Starting symbol
 
                     (Download mode)
       --directory   The download directory. Default: downloaded
-
-                    (Scrape mode)
-      --source      Source of data
-      --fromSymbol  Starting symbol
 """
 
 if __name__ == '__main__':
@@ -53,17 +51,8 @@ if __name__ == '__main__':
   if 'help' in argv or len(argv) is 1:
     print(description)
   elif 'scrape' in argv:
-    needAdjustments = '-a' in options
-    source = get_param('source', options) if not needAdjustments else None
     retryMax = get_param('retryMax', options)
-
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
-
-    targetSources = ['10JQKA', 'HKEX']
-    if source not in targetSources and not needAdjustments:
-      print('WARNING:')
-      print('\tSource should be provided, choosing from targetSources({}).'.format(', '.join(targetSources)))
-      exit()
 
     if len(argv) < 3:
       print(description, '\n'*2)
@@ -71,21 +60,13 @@ if __name__ == '__main__':
       print('\tTarget should be provided.', '\n'*2)
       exit()
     else:
-      symbol = argv[2]
+      symbol = argv[2].upper()
       fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
 
-    if needAdjustments:
-      scraper = FinAdapter(apiUrl, token, retryMax, symbol, fromSymbol)
-    elif source == '10JQKA':
-      # Scrape financials
-      scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
-    elif source == 'HKEX':
-      # Scrape sharesOutstanding on the latest financials
-      scraper = FinHKEX(apiUrl, token, retryMax, symbol, fromSymbol)
-    
+    scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
     scraper.process()
   else:
-    symbol = argv[1]
+    symbol = argv[1].upper()
     needConsolidatedTables = '-T' in options
     needTables = '-t' in options
     needNotes = '-n' in options
@@ -97,7 +78,9 @@ if __name__ == '__main__':
     downloadDirectory = downloadDirectory if downloadDirectory not in [None, ''] else default['downloadDirectory']
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
-    handler = FinReportHandler(downloadDirectory, retryMax, symbol)
+    fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
+
+    handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
     handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, notes=needNotes, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
 
-    print('Exit')
+  print('Exit')

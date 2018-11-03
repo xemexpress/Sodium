@@ -44,7 +44,7 @@ class BasicTools:
     data = json.loads(json_string) if '{' in json_string and '}' in json_string else None
     if data:
       if 'errors' in data:
-        return { 'state': False, 'data': data['errors'] }
+        return { 'state': False, 'data': data['errors']['message'] }
       else:
         if informative:
           print('Success.')
@@ -53,7 +53,10 @@ class BasicTools:
       print('Error: {}'.format(json_string))
       return { 'state': False, 'data': json_string }
     
-  def retrieve_all_symbols(self, retryMax):           # Format: [symbol, companyName]
+  def stock_code(self, symbol):         # return a 5-letter-long symbol
+    return symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
+
+  def retrieve_all_symbols(self, symbol, retryMax):              # Format: [(symbol, companyName)]
     self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
 
     site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
@@ -69,9 +72,20 @@ class BasicTools:
     bs = BeautifulSoup(response.content, 'lxml')
     
     self.report('Data retrieved. Further processing...\n')
+
     result = bs.select("[class^=TableContentStyle]")
-    result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], result))
+    
+    if symbol == 'ALL':
+      result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], result))
+    else:
+      symbol = self.stock_code(symbol)
+      result = list(filter(lambda x: x.contents[0].get_text() == symbol, result))
     result = list(map(lambda x: [x.contents[0].get_text(), x.contents[1].get_text()], result))
+    
+    if len(result) == 0:
+      print("{} can't be found. Please check.".format(symbol))
+      exit()
+    
     self.announce('Data are already formatted in form of [symbol, companyName]', skip=7)
     return result
 
@@ -99,12 +113,12 @@ class FinDataScraper(BasicTools):
     if symbol == 'ALL':
       self.announce("REMINDING: You're conducting a COMPLETE financial data search", wait=7, skip=7)
     
-    self.symbols = self.retrieve_all_symbols(retryMax)
+    self.symbols = self.retrieve_all_symbols(symbol, retryMax)
     if symbol == 'ALL':
       if fromSymbol is None:
         return
       else:
-        fromSymbol = fromSymbol if len(fromSymbol) == 5 else '0'*(5-len(fromSymbol))+fromSymbol
+        fromSymbol = self.stock_code(fromSymbol)
         for i, unit in enumerate(self.symbols):
           if unit[0] == fromSymbol:
             self.symbols = self.symbols[i:]
@@ -112,7 +126,7 @@ class FinDataScraper(BasicTools):
             return
         symbol = fromSymbol
     else:
-      symbol = symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
+      symbol = self.stock_code(symbol)
       for i, unit in enumerate(self.symbols):
         if unit[0] == symbol:
           self.symbols = self.symbols[i:i+1]
@@ -150,7 +164,13 @@ class FinDataScraper(BasicTools):
         self.announce('Retrying again', wait=(i*10+randint(0,4)))
         pass
     
-    if not self.log(response)['state']:
+    response = self.log(response)
+
+    if not response['state']:
+      if response['data'] == 'jwt expired':
+        print('jwt expired')
+        exit()
+
       self.announce('Creating company {} {}...'.format(companyName, symbol), wait=3)
       
       site = 'http://basic.10jqka.com.cn/{}{}/company.html'.format(region, symbol[-4:])
