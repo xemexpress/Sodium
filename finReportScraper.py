@@ -4,9 +4,12 @@ from random import randint
 from urllib.request import urlretrieve
 from glob import glob
 from shutil import rmtree
+import smtplib
+from email.mime.text import MIMEText
 import requests
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfFileReader, PdfFileMerger, PdfFileWriter
+from credentials import sender_email, sender_password, receiver_email
 
 class BasicTools:
     session = requests.session()
@@ -36,6 +39,18 @@ class BasicTools:
             self.announce('All files acquired successfully.', skip=7)
         else:
             print('{}. Got {} left.'.format('Downloaded' if not existed else 'Detected', total - acquired))
+
+    def send_alert(self, subject, symbol):
+        s = smtplib.SMTP('smtp.gmail.com', 587)
+        s.starttls() 
+        s.login(sender_email, sender_password)
+        msg = MIMEText('Symbol: {}\n\n'.format(symbol))
+        msg['Subject'] = subject
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+        s.send_message(msg)
+        s.quit()
+        print('Email sent.')
 
     def stock_code(self, symbol):         # return a 5-letter-long symbol
         return symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
@@ -251,32 +266,34 @@ class FinReportHandler(BasicTools):
 
             return range(destinations[0][1], destinations[-1][1]) if destinations[0] is not None else []
 
-        print('Start extracting tables...')
-        writer = PdfFileWriter()
-        printingPage = 0
-        for pdf in self.pdfs:
-            fileName = pdf.split('/')[-1][:-13]
-            print('Searching in {}...'.format(fileName))
-            reader = PdfFileReader(pdf)
-            isFirstPage = True
-            parent = None
-            bookmarks = []
-            for i in head_and_tail(reader, bookmarks):
-                page = reader.getPage(i)
-                writer.addPage(page)
-                title = [title for title, pageNum in bookmarks if i == pageNum]
-                if isFirstPage:
-                    parent = writer.addBookmark(fileName, printingPage)
-                    isFirstPage = False
-                if title:
-                    writer.addBookmark(title[0], printingPage, parent)
-                printingPage += 1
-        
-        with open('{}/{}/{} {} Tables.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName, 'Consolidated' if onlyFirstThree else ''), 'wb') as tar:
-            writer.write(tar)
-            self.announce('Tables merged successfully.', skip=7)
+        if len(self.pdfs) != 0:
+            print('Start extracting tables...')
+            writer = PdfFileWriter()
+            printingPage = 0
+            for pdf in self.pdfs:
+                fileName = pdf.split('/')[-1][:-13]
+                print('Searching in {}...'.format(fileName))
+                reader = PdfFileReader(pdf)
+                isFirstPage = True
+                parent = None
+                bookmarks = []
+                for i in head_and_tail(reader, bookmarks):
+                    page = reader.getPage(i)
+                    writer.addPage(page)
+                    title = [title for title, pageNum in bookmarks if i == pageNum]
+                    if isFirstPage:
+                        parent = writer.addBookmark(fileName, printingPage)
+                        isFirstPage = False
+                    if title:
+                        writer.addBookmark(title[0], printingPage, parent)
+                    printingPage += 1
+            
+            with open('{}/{}/{} {} Tables.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName, 'Consolidated' if onlyFirstThree else ''), 'wb') as tar:
+                writer.write(tar)
+                self.announce('Tables merged successfully.', skip=7)
 
     def merge_whole(self, companyName, symbol):
+        if len(self.pdfs) != 0:
             print('Start merging files...')
             merger = PdfFileMerger()
             for pdf in self.pdfs:
@@ -295,12 +312,15 @@ class FinReportHandler(BasicTools):
 
     def process(self, consolidatedTables, tables, mergeFiles, cleanUp):
         for (symbol, company) in self.symbols:
-            self.announce('{}: Getting reports'.format(company), wait=(7+randint(0,4)))
-            self.get(company, symbol)
+            try:
+                self.announce('{}: Getting reports'.format(company), wait=(7+randint(0,4)))
+                self.get(company, symbol)
 
-            if mergeFiles:
-                self.merge_whole(company, symbol)
-            if consolidatedTables or tables:
-                self.extract_tables(company, symbol, onlyFirstThree=consolidatedTables)
-            if cleanUp:
-                self.clean_up(company, symbol)
+                if mergeFiles:
+                    self.merge_whole(company, symbol)
+                if consolidatedTables or tables:
+                    self.extract_tables(company, symbol, onlyFirstThree=consolidatedTables)
+                if cleanUp:
+                    self.clean_up(company, symbol)
+            except:
+                self.send_alert('Report Download Alert', symbol)   
