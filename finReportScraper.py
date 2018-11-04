@@ -276,48 +276,6 @@ class FinReportHandler(BasicTools):
             writer.write(tar)
             self.announce('Tables merged successfully.', skip=7)
 
-    def extract_notes(self, companyName, symbol, wanted='附註'):
-        def head_and_tail(reader, wanted=wanted):
-            first = None
-            end = None
-
-            markNext = False
-            for des in reader.getOutlines():
-                end = des if markNext else end
-                
-                markNext = type(des) is not list and wanted in des.title
-                if markNext:
-                    print('Notes extracted.')
-                    first = reader.getDestinationPageNumber(des)
-            if end is None:
-                end = reader.getDestinationPageNumber(reader.getOutlines()[-1] if type(reader.getOutlines()[-1]) is not list else reader.getOutlines()[-1][-1])
-            elif type(end) is list:
-                end = reader.getDestinationPageNumber(end[-1])
-            else:
-                end = reader.getDestinationPageNumber(end)
-            return range(first if first is not None else (end-1), end)
-
-        print('Start extracting notes...')
-        writer = PdfFileWriter()
-        printingPage = 0
-        for pdf in self.pdfs:
-            # Extract notes
-            title = pdf.split('/')[-1][:-13] + ' 附註'
-            print('Searching in {}...'.format(title[:-3]))
-            reader = PdfFileReader(pdf)
-            isFirstPage = True
-            for i in head_and_tail(reader):
-                page = reader.getPage(i)
-                writer.addPage(page)
-                if isFirstPage:
-                    writer.addBookmark(title, printingPage)
-                    isFirstPage = False
-                printingPage += 1
-
-        with open('{}/{}/{} Notes.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName), 'wb') as tar:
-            writer.write(tar)
-            self.announce('Notes merged successfully.', skip=7)
-
     def merge_whole(self, companyName, symbol):
             print('Start merging files...')
             merger = PdfFileMerger()
@@ -335,7 +293,7 @@ class FinReportHandler(BasicTools):
         rmtree('{}/{}/reports'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
         print('Cleaned up.')
 
-    def process(self, consolidatedTables, tables, notes, mergeFiles, cleanUp):
+    def process(self, consolidatedTables, tables, mergeFiles, cleanUp):
         for (symbol, company) in self.symbols:
             self.announce('{}: Getting reports'.format(company), wait=(7+randint(0,4)))
             self.get(company, symbol)
@@ -344,7 +302,5 @@ class FinReportHandler(BasicTools):
                 self.merge_whole(company, symbol)
             if consolidatedTables or tables:
                 self.extract_tables(company, symbol, onlyFirstThree=consolidatedTables)
-            if notes:
-                self.extract_notes(company, symbol)
             if cleanUp:
                 self.clean_up(company, symbol)

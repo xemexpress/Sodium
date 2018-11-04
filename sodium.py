@@ -9,7 +9,7 @@ NAME
 
 SYNOPSIS:
       python sodium.py help
-      python sodium.py [ -t | -T ] [ -n ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ]
+      python sodium.py [ -t | -T ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ]
                               SYMBOL | [ --fromSymbol=SYMBOL ] ALL
       python sodium.py scrape [ --retryMax=MAX ]
                               SYMBOL | [ --fromSymbol=SYMBOL ] ALL
@@ -18,12 +18,8 @@ OPTIONS:
                     (Download mode)
       -t            Extract pages containing table(s) and merge for data analysis.
       -T            Provide a consolidated version of -t
-      -n            Extract notes.
       -m            Merge downloaded financial reports for further studies.
       -C            Clean up downloaded financial reports.
-
-                    (Scrape mode)
-      -a            Adjust structural data
 
 PARAMS:
                     (Common)
@@ -69,7 +65,6 @@ if __name__ == '__main__':
     symbol = argv[1].upper()
     needConsolidatedTables = '-T' in options
     needTables = '-t' in options
-    needNotes = '-n' in options
     needMergeFiles = '-m' in options
     needCleanUp = '-C' in options
     downloadDirectory = get_param('directory', options)
@@ -81,6 +76,6 @@ if __name__ == '__main__':
     fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
 
     handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
-    handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, notes=needNotes, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
+    handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
 
   print('Exit')
