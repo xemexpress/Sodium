@@ -62,7 +62,9 @@ if __name__ == '__main__':
     scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
     scraper.process()
   else:
-    symbol = argv[1].upper()
+    fromSymbol = get_param('fromSymbol', options) if argv[1].upper() == 'ALL' else None
+    symbols = argv[1:] if fromSymbol is None else 'ALL'
+
     needConsolidatedTables = '-T' in options
     needTables = '-t' in options
     needMergeFiles = '-m' in options
@@ -73,9 +75,8 @@ if __name__ == '__main__':
     downloadDirectory = downloadDirectory if downloadDirectory not in [None, ''] else default['downloadDirectory']
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
-    fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
-
-    handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
-    handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
+    for symbol in symbols:
+      handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
+      handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
 
   print('Exit')

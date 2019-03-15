@@ -21,6 +21,8 @@ class BasicTools:
         'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,zh-TW;q=0.7,zh;q=0.6,zh-CN;q=0.5'
     }
+
+    allSymbolResults = []
     
     def announce(self, message, wait=0, skip=0):
         print(message, end=' (waiting for {} seconds)'.format(wait) if wait is not 0 else '')
@@ -76,29 +78,30 @@ class BasicTools:
         return path
 
     def retrieve_all_symbols(self, symbol, retryMax):              # Format: [(symbol, companyName)]
-        self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
+        if(len(self.allSymbolResults) == 0):
+            self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
 
-        site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
+            site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
 
-        for i in range(retryMax):
-            try:
-                response = self.session.get(site, headers=self.headers)
-                break
-            except:
-                self.announce('Retrying again', wait=(i*10+randint(0,4)))
-                pass
+            for i in range(retryMax):
+                try:
+                    response = self.session.get(site, headers=self.headers)
+                    break
+                except:
+                    self.announce('Retrying again', wait=(i*10+randint(0,4)))
+                    pass
 
-        bs = BeautifulSoup(response.content, 'lxml')
-        
-        self.report('Data retrieved. Further processing...\n')
+            bs = BeautifulSoup(response.content, 'lxml')
+            
+            self.report('Data retrieved. Further processing...\n')
 
-        result = bs.select("[class^=TableContentStyle]")
+            self.allSymbolResults = bs.select("[class^=TableContentStyle]")
         
         if symbol == 'ALL':
-            result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], result))
+            result = list(filter(lambda x: x.contents[0].get_text()[0] == '0' and x.contents[0].get_text()[1] in ['0', '1', '2', '3', '6', '8'], self.allSymbolResults))
         else:
             symbol = self.stock_code(symbol)
-            result = list(filter(lambda x: x.contents[0].get_text() == symbol, result))
+            result = list(filter(lambda x: x.contents[0].get_text() == symbol, self.allSymbolResults))
         result = list(map(lambda x: [x.contents[0].get_text(), x.contents[1].get_text()], result))
         
         if len(result) == 0:
