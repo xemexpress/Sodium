@@ -55,16 +55,17 @@ class BasicTools:
     def stock_code(self, symbol):         # return a 5-letter-long symbol
         return symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
 
-    def append_urls(self, bs, pdfs, unwantedWord='多檔案'):                          # Format: [(fileName, source)]
+    def append_urls(self, bs, pdfs, wantedWord='報', unwantedWord='多檔案'):                          # Format: [(fileName, source)]
         for pdf in bs.find_all('a', { 'class': 'news' }):
+            linkText = pdf.get_text()
             # Format: name + publicationDate(for sake of sorting)
-            if unwantedWord not in pdf.next_sibling.next_sibling.string and unwantedWord not in pdf.get_text():
-                fileName = '{} {}.pdf'.format(pdf.get_text().replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
+            if wantedWord in linkText and unwantedWord not in pdf.next_sibling.next_sibling.string and unwantedWord not in linkText:
+                fileName = '{} {}.pdf'.format(linkText.replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
                 source = 'http://www3.hkexnews.hk' + pdf.get('href')
                 pdfs.append([fileName, source])
-                print('PDF {} retrieved.'.format(pdf.get_text()))
+                print('PDF {} retrieved.'.format(linkText))
             else:
-                print('PDF {} with {} skipped.'.format(pdf.get_text(), pdf.next_sibling.next_sibling.string))
+                print('PDF {} with {} skipped.'.format(linkText, pdf.next_sibling.next_sibling.string))
     
     def set_directory(self, downloadDirectory, fileName, companyName, symbol):
         path = '{}/{}/reports/{}'.format(downloadDirectory, '{}{}'.format(symbol, companyName), fileName)
@@ -221,28 +222,33 @@ class FinReportHandler(BasicTools):
             bs = BeautifulSoup(response.content, 'lxml')
             self.append_urls(bs, self.pdfs)
             nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
-        print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), companyName, symbol))
-        
-        prev = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
-        for i, pdf in enumerate(self.pdfs):
-            fileName = pdf[0]
-            source = pdf[1]
-            localPath = self.set_directory(self.downloadDirectory, fileName, companyName, symbol)
-            existed = localPath in prev
-            print('Start working on {}...'.format(fileName))
-            if not existed:
-                print('Downloading from {}'.format(source))
-                for j in range(self.retryMax):
-                    try:
-                        urlretrieve(source, localPath)
-                        break
-                    except:
-                        self.announce('Retrying again', wait=(4+randint(0,4)))
-                        pass
-            self.log_downloads(len(self.pdfs), i+1, existed)
 
-        self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
-        self.pdfs.sort(key=lambda x: x[-12:])
+        if len(self.pdfs) != 0:
+            print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), companyName, symbol))
+            
+            prev = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
+            for i, pdf in enumerate(self.pdfs):
+                fileName = pdf[0]
+                source = pdf[1]
+                localPath = self.set_directory(self.downloadDirectory, fileName, companyName, symbol)
+                existed = localPath in prev
+                print('Start working on {}...'.format(fileName))
+                if not existed:
+                    print('Downloading from {}'.format(source))
+                    for j in range(self.retryMax):
+                        try:
+                            urlretrieve(source, localPath)
+                            break
+                        except:
+                            self.announce('Retrying again', wait=(4+randint(0,4)))
+                            pass
+                self.log_downloads(len(self.pdfs), i+1, existed)
+
+            self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
+            self.pdfs.sort(key=lambda x: x[-12:])
+        else:
+            print('No financial reports listed. Exit.\n')
+            exit()
         
     def extract_tables(self, companyName, symbol, onlyFirstThree, wanted='表', unwanted='附註'):
         def head_and_tail(reader, destinations, wantedWord=wanted, unwantedWord=unwanted, requireConsolidated=onlyFirstThree):
@@ -312,7 +318,7 @@ class FinReportHandler(BasicTools):
 
     def process(self, consolidatedTables, tables, mergeFiles, cleanUp):
         for (symbol, company) in self.symbols:
-            try:
+            # try:
                 self.announce('{}: Getting reports'.format(company), wait=(7+randint(0,4)))
                 self.get(company, symbol)
 
@@ -322,5 +328,5 @@ class FinReportHandler(BasicTools):
                     self.extract_tables(company, symbol, onlyFirstThree=consolidatedTables)
                 if cleanUp:
                     self.clean_up(company, symbol)
-            except:
-                self.send_alert('Report Download Alert', symbol)   
+            # except:
+            #     self.send_alert('Report Download Alert', symbol)   
