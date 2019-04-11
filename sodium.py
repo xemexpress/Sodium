@@ -76,7 +76,10 @@ if __name__ == '__main__':
     retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
 
     for symbol in symbols:
-      handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
-      handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
+      try:
+          handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
+          handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
+      except:
+          pass
 
   print('Exit')
