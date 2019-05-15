@@ -23,6 +23,14 @@ class BasicTools:
     }
 
     allSymbolResults = []
+
+    lang = 'ch'
+
+    source_site = ''
+
+    wanted_word = '報'
+
+    unwanted_word = '多檔案'
     
     def announce(self, message, wait=0, skip=0):
         print(message, end=' (waiting for {} seconds)'.format(wait) if wait is not 0 else '')
@@ -57,33 +65,33 @@ class BasicTools:
     def stock_code(self, symbol):         # return a 5-letter-long symbol
         return symbol if len(symbol) == 5 else '0'*(5-len(symbol))+symbol
 
-    def append_urls(self, bs, pdfs, wantedWord='報', unwantedWord='多檔案'):                          # Format: [(fileName, source)]
+    def append_urls(self, bs, pdfs, wanted_word='報', unwanted_word='多檔案'):                          # Format: [(file_name, source)]
         for pdf in bs.find_all('a', { 'class': 'news' }):
             linkText = pdf.get_text()
             # Format: name + publicationDate(for sake of sorting)
-            if wantedWord in linkText and unwantedWord not in pdf.next_sibling.next_sibling.string and unwantedWord not in linkText:
-                fileName = '{} {}.pdf'.format(linkText.replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
+            if wanted_word in linkText and unwanted_word not in pdf.next_sibling.next_sibling.string and unwanted_word not in linkText:
+                file_name = '{} {}.pdf'.format(linkText.replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
                 source = 'http://www3.hkexnews.hk' + pdf.get('href')
-                pdfs.append([fileName, source])
+                pdfs.append([file_name, source])
                 print('PDF {} retrieved.'.format(linkText))
             else:
                 print('PDF {} with {} skipped.'.format(linkText, pdf.next_sibling.next_sibling.string))
     
-    def set_directory(self, downloadDirectory, fileName, companyName, symbol):
-        path = '{}/{}/reports/{}'.format(downloadDirectory, '{}{}'.format(symbol, companyName), fileName)
+    def set_directory(self, download_directory, file_name, company_name, symbol):
+        path = '{}/{}/reports/{}'.format(download_directory, '{}{}'.format(symbol, company_name), file_name)
         directory = os.path.dirname(path)
         
         if not os.path.exists(directory):
             os.makedirs(directory)
         return path
 
-    def retrieve_all_symbols(self, symbol, retryMax):              # Format: [(symbol, companyName)]
+    def retrieve_all_symbols(self, symbol, retry_max):              # Format: [(symbol, company_name)]
         if(len(self.allSymbolResults) == 0):
-            self.report('Retrieving all possible symbols and companyNames from HKEX...\n')
+            self.report('Retrieving all possible symbols and company_names from HKEX...\n')
 
             site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/stocklist_active_main_c.htm'
 
-            for i in range(retryMax):
+            for i in range(retry_max):
                 try:
                     response = self.session.get(site, headers=self.headers)
                     break
@@ -108,37 +116,41 @@ class BasicTools:
             print("{} can't be found. Please check.".format(symbol))
             exit()
         
-        self.announce('Data are already formatted in form of [symbol, companyName]', skip=7)
+        self.announce('Data are already formatted in form of [symbol, company_name]', skip=7)
         return result
 
 class FinReportHandler(BasicTools):
-    downloadDirectory = ''
-    retryMax = 0
-    symbols = []                # [(symbol, companyName)]
-    pdfs = []                   # [(fileName, source)]
+    download_directory = ''
+    retry_max = 0
+    symbols = []                # [(symbol, company_name)]
+    pdfs = []                   # [(file_name, source)]
 
-    def __init__(self, downloadDirectory, retryMax, symbol, fromSymbol=None):
+    def __init__(self, download_directory, retry_max, symbol, from_symbol=None, lang='ch'):
         print('\n'*20)
 
-        self.downloadDirectory = downloadDirectory
-        self.retryMax = retryMax
+        self.download_directory = download_directory
+        self.retry_max = retry_max
+        self.lang = lang
+        self.source_site = f'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main{"_c" if self.lang=="ch" else ""}.aspx'
 
+        self.wanted_word = '報' if self.lang == 'ch' else 'REPORT'
+        
         # Set symbols
         if symbol == 'ALL':
             self.announce("REMINDING: You're conducting a COMPLETE financial reports search", wait=7, skip=7)
         
-        self.symbols = self.retrieve_all_symbols(symbol, retryMax)
+        self.symbols = self.retrieve_all_symbols(symbol, retry_max)
         if symbol == 'ALL':
-            if fromSymbol is None:
+            if from_symbol is None:
                 return
             else:
-                fromSymbol = self.stock_code(fromSymbol)
+                from_symbol = self.stock_code(from_symbol)
                 for i, unit in enumerate(self.symbols):
-                    if unit[0] == fromSymbol:
+                    if unit[0] == from_symbol:
                         self.symbols = self.symbols[i:]
                         print('Starting from {} {}...'.format(unit[1], unit[0]))
                         return
-                symbol = fromSymbol
+                symbol = from_symbol
         else:
             symbol = self.stock_code(symbol)
             for i, unit in enumerate(self.symbols):
@@ -150,12 +162,12 @@ class FinReportHandler(BasicTools):
         print("{} can't be found. Please check.".format(symbol))
         exit()
         
-    def get(self, companyName, symbol): # This sets self.pdfs
+    def get(self, company_name, symbol): # This sets self.pdfs
         self.pdfs = []
 
-        for i in range(self.retryMax):
+        for i in range(self.retry_max):
             try:
-                response = self.session.get('http://www3.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', headers=self.headers)
+                response = self.session.get(self.source_site, headers=self.headers)
                 break
             except:
                 self.announce('Retrying again', wait=(4+randint(0,4)))
@@ -194,19 +206,19 @@ class FinReportHandler(BasicTools):
             'ctl00$sel_defaultDateRange': 'SevenDays',
             'ctl00$rdo_SelectSortBy': 'rbDateTime'
         }
-        for i in range(self.retryMax):
+        for i in range(self.retry_max):
             try:
-                response = self.session.post('http://www3.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', data=form_data, headers=self.headers)
+                response = self.session.post(self.source_site, data=form_data, headers=self.headers)
                 break
             except:
                 self.announce('Retrying again', wait=(i*10+randint(0,4)))
                 pass
         bs = BeautifulSoup(response.content, 'lxml')
 
-        self.append_urls(bs, self.pdfs)
+        self.append_urls(bs, self.pdfs, wanted_word=self.wanted_word)
 
-        nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
-        while nextBtn is not None:
+        next_btn = bs.find('input', { 'name': 'ctl00$btnNext' })
+        while next_btn is not None:
             self.announce('Heading to next button', wait=(4+randint(0,4)))
             form_data = {
                 '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
@@ -215,61 +227,61 @@ class FinReportHandler(BasicTools):
                 'ctl00$btnNext.x': 1,
                 'ctl00$btnNext.y': 1
             }
-            for i in range(self.retryMax):
+            for i in range(self.retry_max):
                 try:
-                    response = self.session.post('http://www3.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main_c.aspx', data=form_data, headers=self.headers)
+                    response = self.session.post(self.source_site, data=form_data, headers=self.headers)
                     break
                 except:
                     self.announce('Retrying again', wait=(i*10+randint(0,4)))
                     pass
             bs = BeautifulSoup(response.content, 'lxml')
-            self.append_urls(bs, self.pdfs)
-            nextBtn = bs.find('input', { 'name': 'ctl00$btnNext' })
+            self.append_urls(bs, self.pdfs, wanted_word=self.wanted_word)
+            next_btn = bs.find('input', { 'name': 'ctl00$btnNext' })
 
         if len(self.pdfs) != 0:
-            print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), companyName, symbol))
+            print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), company_name, symbol))
             
-            prev = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
+            prev = glob('{}/{}/reports/*.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en')))
             for i, pdf in enumerate(self.pdfs):
-                fileName = pdf[0]
+                file_name = pdf[0]
                 source = pdf[1]
-                localPath = self.set_directory(self.downloadDirectory, fileName, companyName, symbol)
-                existed = localPath in prev
-                print('Start working on {}...'.format(fileName))
+                local_path = self.set_directory(self.download_directory, file_name, company_name, symbol)
+                existed = local_path in prev
+                print('Start working on {}...'.format(file_name))
                 if not existed:
                     print('Downloading from {}'.format(source))
-                    for j in range(self.retryMax):
+                    for j in range(self.retry_max):
                         try:
-                            urlretrieve(source, localPath)
+                            urlretrieve(source, local_path)
                             break
                         except:
                             self.announce('Retrying again', wait=(4+randint(0,4)))
                             pass
                 self.log_downloads(len(self.pdfs), i+1, existed)
 
-            self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
+            self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en')))
             self.pdfs.sort(key=lambda x: x[-12:])
         else:
             print('No financial reports listed. Exit.\n')
             exit()
         
-    def extract_tables(self, companyName, symbol, onlyFirstThree, wanted='表', unwanted='附註'):
-        def head_and_tail(reader, destinations, wantedWord=wanted, unwantedWord=unwanted, requireConsolidated=onlyFirstThree):
+    def extract_tables(self, company_name, symbol, only_first_three, wanted='表', unwanted='附註'):
+        def head_and_tail(reader, destinations, wanted_word=wanted, unwanted_word=unwanted, require_consolidated=only_first_three):
             # Destination's format: [(title, pageNum)]
-            lastMark = None
-            markNext = False
+            last_mark = None
+            mark_next = False
             for des in reader.getOutlines():
-                lastMark = des if markNext else lastMark
+                last_mark = des if mark_next else last_mark
 
-                if requireConsolidated and len(destinations) == 3:
+                if require_consolidated and len(destinations) == 3:
                     break
 
-                markNext = type(des) is not list and wantedWord in des.title and unwantedWord not in des.title
-                if markNext:
+                mark_next = type(des) is not list and wanted_word in des.title and unwanted_word not in des.title
+                if mark_next:
                     destinations.append((des.title, reader.getDestinationPageNumber(des)))
                     print('{} extracted'.format(des.title))
-            if lastMark is not None:
-                destinations.append((lastMark.title, reader.getDestinationPageNumber(lastMark)))
+            if last_mark is not None:
+                destinations.append((last_mark.title, reader.getDestinationPageNumber(last_mark)))
             else:
                 destinations.append(('.', reader.getNumPages()))
 
@@ -278,58 +290,58 @@ class FinReportHandler(BasicTools):
         if len(self.pdfs) != 0:
             print('Start extracting tables...')
             writer = PdfFileWriter()
-            printingPage = 0
+            printing_page = 0
             for pdf in self.pdfs:
-                fileName = pdf.split('/')[-1][:-13]
-                print('Searching in {}...'.format(fileName))
+                file_name = pdf.split('/')[-1][:-13]
+                print('Searching in {}...'.format(file_name))
                 reader = PdfFileReader(pdf)
-                isFirstPage = True
+                is_first_page = True
                 parent = None
                 bookmarks = []
                 for i in head_and_tail(reader, bookmarks):
                     page = reader.getPage(i)
                     writer.addPage(page)
                     title = [title for title, pageNum in bookmarks if i == pageNum]
-                    if isFirstPage:
-                        parent = writer.addBookmark(fileName, printingPage)
-                        isFirstPage = False
+                    if is_first_page:
+                        parent = writer.addBookmark(file_name, printing_page)
+                        is_first_page = False
                     if title:
-                        writer.addBookmark(title[0], printingPage, parent)
-                    printingPage += 1
+                        writer.addBookmark(title[0], printing_page, parent)
+                    printing_page += 1
             
-            with open('{}/{}/{} {} Tables.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName, 'Consolidated' if onlyFirstThree else ''), 'wb') as tar:
+            with open('{}/{}/{} {} Tables.pdf'.format(self.download_directory, '{}{}'.format(symbol, company_name), company_name, 'Consolidated' if only_first_three else ''), 'wb') as tar:
                 writer.write(tar)
                 self.announce('Tables merged successfully.', skip=7)
 
-    def merge_whole(self, companyName, symbol):
+    def merge_whole(self, company_name, symbol):
         if len(self.pdfs) != 0:
             print('Start merging files...')
             merger = PdfFileMerger()
             for pdf in self.pdfs:
-                fileName = pdf.split('/')[-1][:-13]
-                merger.append(pdf, bookmark=fileName)
-                print('{} merged.'.format(fileName))
+                file_name = pdf.split('/')[-1][:-13]
+                merger.append(pdf, bookmark=file_name)
+                print('{} merged.'.format(file_name))
 
             print('Start writing...')
-            with open('{}/{}/{}.pdf'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName), companyName), 'wb') as tar:
+            with open('{}/{}/{}.pdf'.format(self.download_directory, '{}{}'.format(symbol, company_name), company_name), 'wb') as tar:
                 merger.write(tar)
                 self.announce('Merged successfully.', skip=7)
 
-    def clean_up(self, companyName, symbol):
-        rmtree('{}/{}/reports'.format(self.downloadDirectory, '{}{}'.format(symbol, companyName)))
+    def clean_up(self, company_name, symbol):
+        rmtree('{}/{}/reports'.format(self.download_directory, '{}{}'.format(symbol, company_name)))
         print('Cleaned up.')
 
-    def process(self, consolidatedTables, tables, mergeFiles, cleanUp):
+    def process(self, consolidated_tables, tables, merge_files, clean_up):
         for (symbol, company) in self.symbols:
             # try:
                 self.announce('{}: Getting reports'.format(company), wait=(7+randint(0,4)))
                 self.get(company, symbol)
 
-                if mergeFiles:
+                if merge_files:
                     self.merge_whole(company, symbol)
-                if consolidatedTables or tables:
-                    self.extract_tables(company, symbol, onlyFirstThree=consolidatedTables)
-                if cleanUp:
+                if consolidated_tables or tables:
+                    self.extract_tables(company, symbol, only_first_three=consolidated_tables)
+                if clean_up:
                     self.clean_up(company, symbol)
             # except:
             #     self.send_alert('Report Download Alert', symbol)   

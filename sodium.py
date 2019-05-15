@@ -9,10 +9,10 @@ NAME
 
 SYNOPSIS:
       python sodium.py help
-      python sodium.py [ -t | -T ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retryMax=MAX ]
-                              SYMBOL | [ --fromSymbol=SYMBOL ] ALL
-      python sodium.py scrape [ --retryMax=MAX ]
-                              SYMBOL | [ --fromSymbol=SYMBOL ] ALL
+      python sodium.py [ -t | -T ] [ -m ] [ -C ] [ --directory=DIRECTORY ] [ --retry_max=MAX ]
+                              SYMBOL | [ --from_symbol=SYMBOL ] ALL
+      python sodium.py scrape [ --retry_max=MAX ]
+                              SYMBOL | [ --from_symbol=SYMBOL ] ALL
 
 OPTIONS:
                     (Download mode)
@@ -23,8 +23,9 @@ OPTIONS:
 
 PARAMS:
                     (Common)
-      --retryMax    Number of retries made when failed to download the pdf from HKEX. Default: 3
-      --fromSymbol  Starting symbol
+      --retry_max    Number of retries made when failed to download the pdf from HKEX. Default: 3
+      --from_symbol  Starting symbol
+      --lang        If Chinese is preferred, 'ch' (default); otherwise, 'en' (recommended) for english.
 
                     (Download mode)
       --directory   The download directory. Default: downloaded
@@ -40,15 +41,15 @@ if __name__ == '__main__':
   argv = [arg for arg in argv if arg not in options]
 
   default = {
-    'retryMax': 7,
-    'downloadDirectory': 'downloaded'
+    'retry_max': 7,
+    'download_directory': 'downloaded'
   }
 
   if 'help' in argv or len(argv) is 1:
     print(description)
   elif 'scrape' in argv:
-    retryMax = get_param('retryMax', options)
-    retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
+    retry_max = get_param('retry_max', options)
+    retry_max = int(retry_max if retry_max is not None and retry_max.isdigit() else default['retry_max'])
 
     if len(argv) < 3:
       print(description, '\n'*2)
@@ -57,28 +58,29 @@ if __name__ == '__main__':
       exit()
     else:
       symbol = argv[2].upper()
-      fromSymbol = get_param('fromSymbol', options) if symbol == 'ALL' else None
+      from_symbol = get_param('from_symbol', options) if symbol == 'ALL' else None
 
-    scraper = Fin10JQKA(apiUrl, token, retryMax, symbol, fromSymbol)
+    scraper = Fin10JQKA(apiUrl, token, retry_max, symbol, from_symbol)
     scraper.process()
   else:
-    fromSymbol = get_param('fromSymbol', options) if argv[1].upper() == 'ALL' else None
-    symbols = argv[1:] if fromSymbol is None else 'ALL'
+    from_symbol = get_param('from_symbol', options) if argv[1].upper() == 'ALL' else None
+    symbols = argv[1:] if from_symbol is None else 'ALL'
 
-    needConsolidatedTables = '-T' in options
-    needTables = '-t' in options
-    needMergeFiles = '-m' in options
-    needCleanUp = '-C' in options
-    downloadDirectory = get_param('directory', options)
-    retryMax = get_param('retryMax', options)
+    need_consolidated_tables = '-T' in options
+    need_tables = '-t' in options
+    need_merge_files = '-m' in options
+    need_clean_up = '-C' in options
+    download_directory = get_param('directory', options)
+    retry_max = get_param('retry_max', options)
+    lang = get_param('lang', options).lower()
 
-    downloadDirectory = downloadDirectory if downloadDirectory not in [None, ''] else default['downloadDirectory']
-    retryMax = int(retryMax if retryMax is not None and retryMax.isdigit() else default['retryMax'])
+    download_directory = download_directory if download_directory not in [None, ''] else default['download_directory']
+    retry_max = int(retry_max if retry_max is not None and retry_max.isdigit() else default['retry_max'])
 
     for symbol in symbols:
       try:
-          handler = FinReportHandler(downloadDirectory, retryMax, symbol, fromSymbol)
-          handler.process(consolidatedTables=needConsolidatedTables, tables=needTables, mergeFiles=needMergeFiles, cleanUp=needCleanUp)
+          handler = FinReportHandler(download_directory, retry_max, symbol, from_symbol, lang)
+          handler.process(consolidated_tables=need_consolidated_tables, tables=need_tables, merge_files=need_merge_files, clean_up=need_clean_up)
       except:
           pass
 
