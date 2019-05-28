@@ -10,7 +10,7 @@ def continuousYears(n):
             del collection[key]
     return collection
 
-def countList():
+def countList(simple=False):
     i = 0
     while True:
         result = continuousYears(i)
@@ -18,7 +18,8 @@ def countList():
         if len(result.keys()) == 0:
             break
         print('Continuous {} year{}'.format(i, '.' if i < 2 else 's.'))
-        print(result, end='\n\n\n\n')
+        content = ', '.join(list(result.keys())) if not simple else ' '.join([el.split(' ')[-1] for el in list(result.keys())])
+        print(content, end='\n\n\n\n')
         i = i + 1
 
 def search(word=None):

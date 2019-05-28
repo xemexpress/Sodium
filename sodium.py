@@ -1,3 +1,4 @@
+import time
 from sys import argv
 from finDataScraper import Fin10JQKA
 from finReportScraper import FinReportHandler
@@ -17,8 +18,9 @@ SYNOPSIS:
 OPTIONS:
                     (Download mode)
       -t            Extract pages containing table(s) and merge for data analysis.
-      -T            Provide a consolidated version of -t
+      -T            Extract notes.
       -m            Merge downloaded financial reports for further studies.
+      -S            Skip downloading reports as this assumes required reports have been downloaded.
       -C            Clean up downloaded financial reports.
 
 PARAMS:
@@ -69,18 +71,26 @@ if __name__ == '__main__':
     need_consolidated_tables = '-T' in options
     need_tables = '-t' in options
     need_merge_files = '-m' in options
+    skip_download = '-S' in options
     need_clean_up = '-C' in options
     download_directory = get_param('directory', options)
     retry_max = get_param('retry_max', options)
-    lang = get_param('lang', options).lower()
+    lang = get_param('lang', options)
+    lang = lang.lower() if lang else 'ch'
 
     download_directory = download_directory if download_directory not in [None, ''] else default['download_directory']
     retry_max = int(retry_max if retry_max is not None and retry_max.isdigit() else default['retry_max'])
+    
+    print('\n\nWARNING: YOU ARE SKIPPING REPORT DOWNLOAD PROCESSES!! \n\n Confirm by ^C.')
+    try:
+      time.sleep(9999999)
+    except:
+      pass
 
     for symbol in symbols:
       try:
           handler = FinReportHandler(download_directory, retry_max, symbol, from_symbol, lang)
-          handler.process(consolidated_tables=need_consolidated_tables, tables=need_tables, merge_files=need_merge_files, clean_up=need_clean_up)
+          handler.process(consolidated_tables=need_consolidated_tables, tables=need_tables, merge_files=need_merge_files, skip_download=skip_download, clean_up=need_clean_up)
       except:
           pass
 

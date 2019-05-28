@@ -69,7 +69,7 @@ class BasicTools:
         for pdf in bs.find_all('a', { 'class': 'news' }):
             linkText = pdf.get_text()
             # Format: name + publicationDate(for sake of sorting)
-            if wanted_word in linkText and unwanted_word not in pdf.next_sibling.next_sibling.string and unwanted_word not in linkText:
+            if wanted_word in linkText.upper() and unwanted_word not in pdf.next_sibling.next_sibling.string.upper() and unwanted_word not in linkText.upper():
                 file_name = '{} {}.pdf'.format(linkText.replace('/', '%'), ''.join(pdf.get('href').split('/')[4:6]))
                 source = 'http://www3.hkexnews.hk' + pdf.get('href')
                 pdfs.append([file_name, source])
@@ -78,7 +78,7 @@ class BasicTools:
                 print('PDF {} with {} skipped.'.format(linkText, pdf.next_sibling.next_sibling.string))
     
     def set_directory(self, download_directory, file_name, company_name, symbol):
-        path = '{}/{}/reports/{}'.format(download_directory, '{}{}'.format(symbol, company_name), file_name)
+        path = '{}/{}/reports/{}'.format(download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en'), file_name)
         directory = os.path.dirname(path)
         
         if not os.path.exists(directory):
@@ -131,9 +131,11 @@ class FinReportHandler(BasicTools):
         self.download_directory = download_directory
         self.retry_max = retry_max
         self.lang = lang
-        self.source_site = f'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main{"_c" if self.lang=="ch" else ""}.aspx'
+        self.source_site = 'http://www3.hkexnews.hk/listedco/listconews/advancedsearch/search_active_main{}.aspx'.format('' if self.lang=='en' else '_c')
 
         self.wanted_word = '報' if self.lang == 'ch' else 'REPORT'
+        self.table_wanted_word = '表' if self.lang == 'ch' else 'STATEMENT'
+        self.table_unwanted_word = '附註' if self.lang == 'ch' else 'NOTES'
         
         # Set symbols
         if symbol == 'ALL':
@@ -162,70 +164,50 @@ class FinReportHandler(BasicTools):
         print("{} can't be found. Please check.".format(symbol))
         exit()
         
-    def get(self, company_name, symbol): # This sets self.pdfs
+    def get(self, company_name, symbol, skip_download): # This sets self.pdfs
         self.pdfs = []
 
-        for i in range(self.retry_max):
-            try:
-                response = self.session.get(self.source_site, headers=self.headers)
-                break
-            except:
-                self.announce('Retrying again', wait=(4+randint(0,4)))
-                pass
+        if not skip_download:
+            for i in range(self.retry_max):
+                try:
+                    response = self.session.get(self.source_site, headers=self.headers)
+                    break
+                except:
+                    self.announce('Retrying again', wait=(4+randint(0,4)))
+                    pass
 
-        bs = BeautifulSoup(response.content, 'lxml')
+            bs = BeautifulSoup(response.content, 'lxml')
 
-        date = bs.find('input', { 'name': 'ctl00$txt_today' }).get('value')
-        date = {
-            'year': date[:4],
-            'month': date[4:6],
-            'day': date[-2:]
-        }
+            date = bs.find('input', { 'name': 'ctl00$txt_today' }).get('value')
+            date = {
+                'year': date[:4],
+                'month': date[4:6],
+                'day': date[-2:]
+            }
 
-        form_data = {
-            '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
-            '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
-            '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
-            'ctl00$txt_today': date['year']+date['month']+date['day'],
-            'ctl00$hfStatus': bs.find('input', { 'name': 'ctl00$hfStatus' }).get('value'),
-            'ctl00$txt_stock_code': symbol,
-            'ctl00$rdo_SelectDocType': 'rbAfter2006',
-            'ctl00$sel_tier_1': 4,
-            'ctl00$sel_DocTypePrior2006': -1,
-            'ctl00$sel_tier_2_group': -2,
-            'ctl00$sel_tier_2': -2,
-            'ctl00$ddlTierTwo': bs.find('select', { 'name': 'ctl00$ddlTierTwo' }).select('option:nth-of-type(1)')[0].get('value'),     # can try "59,1,7"
-            'ctl00$ddlTierTwoGroup': bs.find('select', { 'name': 'ctl00$ddlTierTwoGroup' }).select('option:nth-of-type(1)')[0].get('value'),     # can try "26,5",
-            'ctl00$rdo_SelectDateOfRelease': 'rbManualRange',
-            'ctl00$sel_DateOfReleaseFrom_d': '01',
-            'ctl00$sel_DateOfReleaseFrom_m': '04',
-            'ctl00$sel_DateOfReleaseFrom_y': '1999',
-            'ctl00$sel_DateOfReleaseTo_d': date['day'],
-            'ctl00$sel_DateOfReleaseTo_m': date['month'],
-            'ctl00$sel_DateOfReleaseTo_y': date['year'],
-            'ctl00$sel_defaultDateRange': 'SevenDays',
-            'ctl00$rdo_SelectSortBy': 'rbDateTime'
-        }
-        for i in range(self.retry_max):
-            try:
-                response = self.session.post(self.source_site, data=form_data, headers=self.headers)
-                break
-            except:
-                self.announce('Retrying again', wait=(i*10+randint(0,4)))
-                pass
-        bs = BeautifulSoup(response.content, 'lxml')
-
-        self.append_urls(bs, self.pdfs, wanted_word=self.wanted_word)
-
-        next_btn = bs.find('input', { 'name': 'ctl00$btnNext' })
-        while next_btn is not None:
-            self.announce('Heading to next button', wait=(4+randint(0,4)))
             form_data = {
                 '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
                 '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
                 '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
-                'ctl00$btnNext.x': 1,
-                'ctl00$btnNext.y': 1
+                'ctl00$txt_today': date['year']+date['month']+date['day'],
+                'ctl00$hfStatus': bs.find('input', { 'name': 'ctl00$hfStatus' }).get('value'),
+                'ctl00$txt_stock_code': symbol,
+                'ctl00$rdo_SelectDocType': 'rbAfter2006',
+                'ctl00$sel_tier_1': 4,
+                'ctl00$sel_DocTypePrior2006': -1,
+                'ctl00$sel_tier_2_group': -2,
+                'ctl00$sel_tier_2': -2,
+                'ctl00$ddlTierTwo': bs.find('select', { 'name': 'ctl00$ddlTierTwo' }).select('option:nth-of-type(1)')[0].get('value'),     # can try "59,1,7"
+                'ctl00$ddlTierTwoGroup': bs.find('select', { 'name': 'ctl00$ddlTierTwoGroup' }).select('option:nth-of-type(1)')[0].get('value'),     # can try "26,5",
+                'ctl00$rdo_SelectDateOfRelease': 'rbManualRange',
+                'ctl00$sel_DateOfReleaseFrom_d': '01',
+                'ctl00$sel_DateOfReleaseFrom_m': '04',
+                'ctl00$sel_DateOfReleaseFrom_y': '1999',
+                'ctl00$sel_DateOfReleaseTo_d': date['day'],
+                'ctl00$sel_DateOfReleaseTo_m': date['month'],
+                'ctl00$sel_DateOfReleaseTo_y': date['year'],
+                'ctl00$sel_defaultDateRange': 'SevenDays',
+                'ctl00$rdo_SelectSortBy': 'rbDateTime'
             }
             for i in range(self.retry_max):
                 try:
@@ -235,10 +217,35 @@ class FinReportHandler(BasicTools):
                     self.announce('Retrying again', wait=(i*10+randint(0,4)))
                     pass
             bs = BeautifulSoup(response.content, 'lxml')
-            self.append_urls(bs, self.pdfs, wanted_word=self.wanted_word)
-            next_btn = bs.find('input', { 'name': 'ctl00$btnNext' })
 
-        if len(self.pdfs) != 0:
+            self.append_urls(bs, self.pdfs, wanted_word=self.wanted_word)
+
+            next_btn = bs.find('input', { 'name': 'ctl00$btnNext' })
+            while next_btn is not None:
+                self.announce('Heading to next button', wait=(4+randint(0,4)))
+                form_data = {
+                    '__VIEWSTATE': bs.find('input', { 'name': '__VIEWSTATE' }).get('value'),
+                    '__VIEWSTATEGENERATOR': bs.find('input', { 'name': '__VIEWSTATEGENERATOR' }).get('value'),
+                    '__VIEWSTATEENCRYPTED': bs.find('input', { 'name': '__VIEWSTATEENCRYPTED' }).get('value'),
+                    'ctl00$btnNext.x': 1,
+                    'ctl00$btnNext.y': 1
+                }
+                for i in range(self.retry_max):
+                    try:
+                        response = self.session.post(self.source_site, data=form_data, headers=self.headers)
+                        break
+                    except:
+                        self.announce('Retrying again', wait=(i*10+randint(0,4)))
+                        pass
+                bs = BeautifulSoup(response.content, 'lxml')
+                self.append_urls(bs, self.pdfs, wanted_word=self.wanted_word)
+                next_btn = bs.find('input', { 'name': 'ctl00$btnNext' })
+
+        if skip_download:
+            self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en')))
+
+            self.pdfs.sort(key=lambda x: x[-12:])
+        elif len(self.pdfs) != 0:
             print('Total: {} files from {} {}.\n\n\n\n'.format(len(self.pdfs), company_name, symbol))
             
             prev = glob('{}/{}/reports/*.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en')))
@@ -260,6 +267,7 @@ class FinReportHandler(BasicTools):
                 self.log_downloads(len(self.pdfs), i+1, existed)
 
             self.pdfs = glob('{}/{}/reports/*.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en')))
+            
             self.pdfs.sort(key=lambda x: x[-12:])
         else:
             print('No financial reports listed. Exit.\n')
@@ -276,7 +284,11 @@ class FinReportHandler(BasicTools):
                 if require_consolidated and len(destinations) == 3:
                     break
 
-                mark_next = type(des) is not list and wanted_word in des.title and unwanted_word not in des.title
+                mark_next = type(des) is not list and wanted_word in des.title.upper() and unwanted_word not in des.title.upper()
+
+                if require_consolidated:
+                    mark_next = type(des) is not list and unwanted_word in des.title.upper()
+
                 if mark_next:
                     destinations.append((des.title, reader.getDestinationPageNumber(des)))
                     print('{} extracted'.format(des.title))
@@ -309,7 +321,7 @@ class FinReportHandler(BasicTools):
                         writer.addBookmark(title[0], printing_page, parent)
                     printing_page += 1
             
-            with open('{}/{}/{} {} Tables.pdf'.format(self.download_directory, '{}{}'.format(symbol, company_name), company_name, 'Consolidated' if only_first_three else ''), 'wb') as tar:
+            with open('{}/{}/{} {} Tables.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en'), company_name, 'Note' if only_first_three else ''), 'wb') as tar:
                 writer.write(tar)
                 self.announce('Tables merged successfully.', skip=7)
 
@@ -323,25 +335,28 @@ class FinReportHandler(BasicTools):
                 print('{} merged.'.format(file_name))
 
             print('Start writing...')
-            with open('{}/{}/{}.pdf'.format(self.download_directory, '{}{}'.format(symbol, company_name), company_name), 'wb') as tar:
+            with open('{}/{}/{}.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en'), company_name), 'wb') as tar:
                 merger.write(tar)
                 self.announce('Merged successfully.', skip=7)
+        else:
+            print('No pdfs.')
 
     def clean_up(self, company_name, symbol):
-        rmtree('{}/{}/reports'.format(self.download_directory, '{}{}'.format(symbol, company_name)))
+        rmtree('{}/{}/reports'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en')))
         print('Cleaned up.')
 
-    def process(self, consolidated_tables, tables, merge_files, clean_up):
+    def process(self, consolidated_tables, tables, merge_files, skip_download, clean_up):
         for (symbol, company) in self.symbols:
-            # try:
-                self.announce('{}: Getting reports'.format(company), wait=(7+randint(0,4)))
-                self.get(company, symbol)
+            print('{}: Processing reports...'.format(company))
+            self.get(company, symbol, skip_download)
 
-                if merge_files:
-                    self.merge_whole(company, symbol)
-                if consolidated_tables or tables:
-                    self.extract_tables(company, symbol, only_first_three=consolidated_tables)
-                if clean_up:
-                    self.clean_up(company, symbol)
+            if merge_files:
+                self.merge_whole(company, symbol)
+            if consolidated_tables or tables:
+                self.extract_tables(company, symbol, only_first_three=consolidated_tables, wanted=self.table_wanted_word, unwanted=self.table_unwanted_word)
+            if consolidated_tables and tables:
+                self.extract_tables(company, symbol, only_first_three=False, wanted=self.table_wanted_word, unwanted=self.table_unwanted_word)
+            if clean_up:
+                self.clean_up(company, symbol)
             # except:
             #     self.send_alert('Report Download Alert', symbol)   
