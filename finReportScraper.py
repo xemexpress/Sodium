@@ -306,20 +306,23 @@ class FinReportHandler(BasicTools):
             for pdf in self.pdfs:
                 file_name = pdf.split('/')[-1][:-13]
                 print('Searching in {}...'.format(file_name))
-                reader = PdfFileReader(pdf)
-                is_first_page = True
-                parent = None
-                bookmarks = []
-                for i in head_and_tail(reader, bookmarks):
-                    page = reader.getPage(i)
-                    writer.addPage(page)
-                    title = [title for title, pageNum in bookmarks if i == pageNum]
-                    if is_first_page:
-                        parent = writer.addBookmark(file_name, printing_page)
-                        is_first_page = False
-                    if title:
-                        writer.addBookmark(title[0], printing_page, parent)
-                    printing_page += 1
+                try:
+                    reader = PdfFileReader(pdf)
+                    is_first_page = True
+                    parent = None
+                    bookmarks = []
+                    for i in head_and_tail(reader, bookmarks):
+                        page = reader.getPage(i)
+                        writer.addPage(page)
+                        title = [title for title, pageNum in bookmarks if i == pageNum]
+                        if is_first_page:
+                            parent = writer.addBookmark(file_name, printing_page)
+                            is_first_page = False
+                        if title:
+                            writer.addBookmark(title[0], printing_page, parent)
+                        printing_page += 1
+                except:
+                    pass
             
             with open('{}/{}/{} {} Tables.pdf'.format(self.download_directory, '{}{}{}'.format(symbol, company_name, '' if self.lang == 'ch' else '_en'), company_name, 'Note' if only_first_three else ''), 'wb') as tar:
                 writer.write(tar)
